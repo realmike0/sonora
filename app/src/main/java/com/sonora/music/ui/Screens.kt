@@ -1,8 +1,32 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.sonora.music.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +38,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,14 +57,10 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearWavyProgressIndicator
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -57,7 +78,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +97,11 @@ import coil.compose.AsyncImage
 import com.sonora.music.PlayerViewModel
 import com.sonora.music.Track
 import java.util.Locale
+import kotlin.math.PI
+import kotlin.math.sin
+
+// Molla "gommosa" usata da quasi tutte le animazioni.
+private const val BOUNCY = Spring.DampingRatioMediumBouncy
 
 @Composable
 fun SonoraScreen(vm: PlayerViewModel) {
@@ -77,7 +110,13 @@ fun SonoraScreen(vm: PlayerViewModel) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            if (vm.nowPlaying != null) MiniPlayer(vm, onOpen = { showPlayer = true })
+            AnimatedVisibility(
+                visible = vm.nowPlaying != null,
+                enter = slideInVertically(spring(BOUNCY, Spring.StiffnessLow)) { it } + fadeIn(),
+                exit = slideOutVertically { it } + fadeOut()
+            ) {
+                MiniPlayer(vm, onOpen = { showPlayer = true })
+            }
         }
     ) { padding ->
         SearchContent(vm, Modifier.padding(padding))
@@ -102,7 +141,7 @@ private fun SearchContent(vm: PlayerViewModel, modifier: Modifier = Modifier) {
 
         when {
             vm.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                LoadingIndicator()
+                BouncyLoader()
             }
 
             vm.results.isEmpty() -> Message(
@@ -114,7 +153,8 @@ private fun SearchContent(vm: PlayerViewModel, modifier: Modifier = Modifier) {
                     TrackRow(
                         track = track,
                         selected = vm.nowPlaying?.id == track.id,
-                        onClick = { vm.playFrom(index) }
+                        onClick = { vm.playFrom(index) },
+                        modifier = Modifier.animateItem()
                     )
                 }
             }
@@ -168,15 +208,73 @@ private fun Message(text: String) {
     }
 }
 
+/** Tre palline che rimbalzano a ondate. */
 @Composable
-private fun TrackRow(track: Track, selected: Boolean, onClick: () -> Unit) {
+private fun BouncyLoader() {
+    val transition = rememberInfiniteTransition(label = "loader")
+    val colors = listOf(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.secondary,
+        MaterialTheme.colorScheme.tertiary
+    )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        colors.forEachIndexed { i, color ->
+            val y by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = -24f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(420, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse,
+                    initialStartOffset = StartOffset(i * 140)
+                ),
+                label = "dot$i"
+            )
+            Box(
+                Modifier
+                    .size(18.dp)
+                    .offset(y = y.dp)
+                    .background(color, CircleShape)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrackRow(
+    track: Track,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.95f else 1f,
+        animationSpec = spring(BOUNCY, Spring.StiffnessMedium),
+        label = "rowPress"
+    )
+    // Il brano in riproduzione si "gonfia": angoli più tondi.
+    val corner by animateDpAsState(
+        targetValue = if (selected) 44.dp else 24.dp,
+        animationSpec = spring(BOUNCY, Spring.StiffnessLow),
+        label = "rowCorner"
+    )
+
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(28.dp),
+        interactionSource = source,
+        shape = RoundedCornerShape(corner),
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 2.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
     ) {
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Artwork(track.thumb, Modifier.size(56.dp), RoundedCornerShape(16.dp))
@@ -242,13 +340,62 @@ private fun MiniPlayer(vm: PlayerViewModel, onOpen: () -> Unit) {
                 }
                 PlayPauseButton(vm, large = false)
             }
-            val playing = vm.wantsPlay
-            LinearWavyProgressIndicator(
-                progress = { vm.progress },
-                amplitude = { if (playing) 1f else 0f },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 14.dp)
+            WavyProgress(
+                progress = vm.progress,
+                playing = vm.wantsPlay,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)
+            )
+        }
+    }
+}
+
+/** Barra di avanzamento a onda: ondeggia mentre suona e si "spiana" in pausa. */
+@Composable
+private fun WavyProgress(progress: Float, playing: Boolean, modifier: Modifier = Modifier) {
+    val active = MaterialTheme.colorScheme.primary
+    val track = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.18f)
+
+    val transition = rememberInfiniteTransition(label = "wave")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(animation = tween(1200, easing = LinearEasing)),
+        label = "phase"
+    )
+    val amp by animateFloatAsState(
+        targetValue = if (playing) 1f else 0f,
+        animationSpec = spring(BOUNCY, Spring.StiffnessVeryLow),
+        label = "amp"
+    )
+
+    Canvas(modifier.fillMaxWidth().height(20.dp)) {
+        val stroke = 4.dp.toPx()
+        val amplitude = 5.dp.toPx() * amp
+        val wavelength = 32.dp.toPx()
+        val cy = size.height / 2f
+        val endX = (size.width * progress).coerceIn(0f, size.width)
+
+        drawLine(
+            color = track,
+            start = Offset(endX, cy),
+            end = Offset(size.width, cy),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+
+        if (endX > 0f) {
+            val path = Path()
+            val step = 3.dp.toPx()
+            var x = 0f
+            path.moveTo(0f, cy + sin(-phase) * amplitude)
+            while (x < endX) {
+                x = (x + step).coerceAtMost(endX)
+                path.lineTo(x, cy + sin(x / wavelength * 2f * PI.toFloat() - phase) * amplitude)
+            }
+            drawPath(
+                path = path,
+                color = active,
+                style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
             )
         }
     }
@@ -257,6 +404,20 @@ private fun MiniPlayer(vm: PlayerViewModel, onOpen: () -> Unit) {
 @Composable
 private fun PlayerSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
     val np = vm.nowPlaying ?: return
+    val playing = vm.wantsPlay
+
+    // La copertina "respira": si rimpicciolisce e si arrotonda in pausa.
+    val artScale by animateFloatAsState(
+        targetValue = if (playing) 1f else 0.86f,
+        animationSpec = spring(BOUNCY, Spring.StiffnessLow),
+        label = "artScale"
+    )
+    val artCorner by animateDpAsState(
+        targetValue = if (playing) 40.dp else 96.dp,
+        animationSpec = spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow),
+        label = "artCorner"
+    )
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -270,8 +431,14 @@ private fun PlayerSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
         ) {
             Artwork(
                 np.artwork,
-                Modifier.fillMaxWidth().aspectRatio(1f),
-                RoundedCornerShape(40.dp)
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .graphicsLayer {
+                        scaleX = artScale
+                        scaleY = artScale
+                    },
+                RoundedCornerShape(artCorner.coerceAtLeast(0.dp))
             )
             Spacer(Modifier.height(24.dp))
             Text(
@@ -310,17 +477,11 @@ private fun PlayerSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                FilledTonalIconButton(
-                    onClick = vm::previous,
-                    modifier = Modifier.size(64.dp)
-                ) {
+                BouncyTonalButton(onClick = vm::previous, modifier = Modifier.size(64.dp)) {
                     Icon(Icons.Rounded.SkipPrevious, "Precedente", Modifier.size(32.dp))
                 }
                 PlayPauseButton(vm, large = true)
-                FilledTonalIconButton(
-                    onClick = vm::next,
-                    modifier = Modifier.size(64.dp)
-                ) {
+                BouncyTonalButton(onClick = vm::next, modifier = Modifier.size(64.dp)) {
                     Icon(Icons.Rounded.SkipNext, "Successivo", Modifier.size(32.dp))
                 }
             }
@@ -329,25 +490,79 @@ private fun PlayerSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
     }
 }
 
-/** Pulsante play/pausa con forma "expressive" che si deforma alla pressione. */
+/**
+ * Play/pausa: la forma passa da cerchio a quadrato smussato con effetto molla,
+ * si schiaccia quando lo premi e l'icona "scoppia" dentro e fuori.
+ */
 @Composable
 private fun PlayPauseButton(vm: PlayerViewModel, large: Boolean) {
-    val size = if (large) IconButtonDefaults.largeContainerSize() else IconButtonDefaults.mediumContainerSize()
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.82f else 1f,
+        animationSpec = spring(Spring.DampingRatioHighBouncy, Spring.StiffnessMedium),
+        label = "playPress"
+    )
+    val cornerPercent by animateIntAsState(
+        targetValue = if (vm.wantsPlay) 32 else 50,
+        animationSpec = spring(BOUNCY, Spring.StiffnessLow),
+        label = "playMorph"
+    )
+
     FilledIconButton(
         onClick = vm::togglePlay,
-        shapes = IconButtonDefaults.shapes(),
-        modifier = Modifier.size(size)
+        interactionSource = source,
+        shape = RoundedCornerShape(percent = cornerPercent.coerceIn(0, 50)),
+        modifier = Modifier
+            .size(if (large) 88.dp else 52.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
     ) {
-        Icon(
-            imageVector = if (vm.wantsPlay) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-            contentDescription = if (vm.wantsPlay) "Pausa" else "Riproduci",
-            modifier = Modifier.size(if (large) 40.dp else 28.dp)
-        )
+        AnimatedContent(
+            targetState = vm.wantsPlay,
+            transitionSpec = {
+                (scaleIn(spring(BOUNCY)) + fadeIn()) togetherWith (scaleOut() + fadeOut())
+            },
+            label = "playIcon"
+        ) { isPlaying ->
+            Icon(
+                imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                contentDescription = if (isPlaying) "Pausa" else "Riproduci",
+                modifier = Modifier.size(if (large) 44.dp else 28.dp)
+            )
+        }
     }
 }
 
+/** Pulsante tonale che rimbalza quando lo premi. */
 @Composable
-private fun Artwork(url: String?, modifier: Modifier, shape: androidx.compose.ui.graphics.Shape) {
+private fun BouncyTonalButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.8f else 1f,
+        animationSpec = spring(Spring.DampingRatioHighBouncy, Spring.StiffnessMedium),
+        label = "btnPress"
+    )
+    FilledTonalIconButton(
+        onClick = onClick,
+        interactionSource = source,
+        modifier = modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        },
+        content = content
+    )
+}
+
+@Composable
+private fun Artwork(url: String?, modifier: Modifier, shape: Shape) {
     Box(
         modifier
             .clip(shape)

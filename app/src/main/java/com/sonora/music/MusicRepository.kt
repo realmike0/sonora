@@ -50,6 +50,7 @@ object MusicRepository {
         extractor.initialPage.items
             .filterIsInstance<StreamInfoItem>()
             .mapNotNull { it.toTrack() }
+            .distinctBy { it.id }
     }
 
     /**
