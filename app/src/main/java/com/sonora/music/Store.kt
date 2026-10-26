@@ -54,14 +54,14 @@ class Store(context: Context) {
         prefs.edit().putString("name", userName).putBoolean("onboarded", true).apply()
     }
 
-    fun setGoogleCookie(cookie: String?) {
+    fun updateGoogleCookie(cookie: String?) {
         googleCookie = cookie
         val e = prefs.edit()
         if (cookie == null) e.remove("cookie") else e.putString("cookie", cookie)
         e.apply()
     }
 
-    fun setLyricsSource(source: String) {
+    fun updateLyricsSource(source: String) {
         lyricsSource = source
         prefs.edit().putString("lyrics_source", source).apply()
     }

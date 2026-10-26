@@ -125,7 +125,7 @@ private fun LyricsSourcePicker(store: Store) {
                 DropdownMenuItem(
                     text = { Text(source) },
                     onClick = {
-                        store.setLyricsSource(source)
+                        store.updateLyricsSource(source)
                         open = false
                     }
                 )

@@ -210,7 +210,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     // ───────── Account Google ─────────
 
     fun connectGoogle(cookie: String) {
-        store.setGoogleCookie(cookie)
+        store.updateGoogleCookie(cookie)
         loginOpen = false
         syncGoogle()
     }
@@ -236,7 +236,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun disconnectGoogle() {
-        store.setGoogleCookie(null)
+        store.updateGoogleCookie(null)
         syncState = SyncState.Idle
         syncError = null
         CookieManager.getInstance().removeAllCookies(null)
