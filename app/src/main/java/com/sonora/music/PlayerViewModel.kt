@@ -2,6 +2,7 @@ package com.sonora.music
 
 import android.app.Application
 import android.content.ComponentName
+import android.webkit.CookieManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -23,10 +24,22 @@ data class NowPlaying(
     val id: String,
     val title: String,
     val artist: String,
-    val artwork: String?
+    val artwork: String?,
+    val durationSec: Long
 )
 
+fun NowPlaying.toTrack() = Track(id, title, artist, artwork, durationSec)
+
+enum class SyncState { Idle, Running, Done, Failed }
+
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
+
+    /** Profilo locale, Mi piace, playlist e impostazioni. */
+    val store = Store(app)
+
+    // --- Navigazione ---
+    var playerOpen by mutableStateOf(false)
+    var loginOpen by mutableStateOf(false)
 
     // --- Ricerca ---
     var query by mutableStateOf("")
@@ -52,6 +65,23 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     val progress: Float
         get() = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
 
+    // --- Testi ---
+    var lyrics by mutableStateOf<Lyrics?>(null)
+        private set
+    var lyricsLoading by mutableStateOf(false)
+        private set
+    private var lyricsFor: String? = null
+    private var lyricsJob: Job? = null
+    private val lyricsCache = HashMap<String, Lyrics>()
+
+    // --- Sincronizzazione Google ---
+    var syncState by mutableStateOf(SyncState.Idle)
+        private set
+    var syncStatus by mutableStateOf("")
+        private set
+    var syncError by mutableStateOf<String?>(null)
+        private set
+
     private var controller: MediaController? = null
     private var searchJob: Job? = null
 
@@ -70,10 +100,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             sync(c)
         }, ContextCompat.getMainExecutor(context))
 
-        // Aggiorna la posizione mentre si ascolta.
+        // Aggiorna la posizione mentre si ascolta (serve anche ai testi sincronizzati).
         viewModelScope.launch {
             while (true) {
-                delay(400)
+                delay(250)
                 controller?.let { if (it.isPlaying) positionMs = it.currentPosition }
             }
         }
@@ -84,15 +114,44 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         isBuffering = p.playbackState == Player.STATE_BUFFERING
         durationMs = p.duration.takeIf { it != C.TIME_UNSET } ?: 0L
         positionMs = p.currentPosition
-        nowPlaying = p.currentMediaItem?.let {
+        val np = p.currentMediaItem?.let {
             NowPlaying(
                 id = it.mediaId,
                 title = it.mediaMetadata.title?.toString().orEmpty(),
                 artist = it.mediaMetadata.artist?.toString().orEmpty(),
-                artwork = it.mediaMetadata.artworkUri?.toString()
+                artwork = it.mediaMetadata.artworkUri?.toString(),
+                durationSec = (it.mediaMetadata.durationMs ?: 0L) / 1000
             )
         }
+        nowPlaying = np
+        if (np?.id != lyricsFor) {
+            lyricsFor = np?.id
+            loadLyrics(np)
+        }
     }
+
+    private fun loadLyrics(np: NowPlaying?) {
+        lyricsJob?.cancel()
+        lyrics = null
+        if (np == null) {
+            lyricsLoading = false
+            return
+        }
+        lyricsCache[np.id]?.let {
+            lyrics = it
+            lyricsLoading = false
+            return
+        }
+        lyricsLoading = true
+        lyricsJob = viewModelScope.launch {
+            val found = LyricsRepository.fetch(store.lyricsSource, np.title, np.artist, np.durationSec)
+            if (found != null) lyricsCache[np.id] = found
+            lyrics = found
+            lyricsLoading = false
+        }
+    }
+
+    // ───────── Ricerca e riproduzione ─────────
 
     fun search() {
         val q = query.trim()
@@ -115,12 +174,15 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun playFrom(index: Int) {
+    fun play(tracks: List<Track>, index: Int) {
         val c = controller ?: return
-        c.setMediaItems(results.map { it.toMediaItem() }, index, 0L)
+        if (tracks.isEmpty()) return
+        c.setMediaItems(tracks.map { it.toMediaItem() }, index.coerceIn(0, tracks.lastIndex), 0L)
         c.prepare()
         c.play()
     }
+
+    fun playFrom(index: Int) = play(results, index)
 
     fun togglePlay() {
         val c = controller ?: return
@@ -136,12 +198,52 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun seekToFraction(fraction: Float) {
+        if (durationMs > 0) seekToMs((fraction * durationMs).toLong())
+    }
+
+    fun seekToMs(ms: Long) {
         val c = controller ?: return
-        if (durationMs > 0) {
-            val target = (fraction * durationMs).toLong()
-            c.seekTo(target)
-            positionMs = target
+        c.seekTo(ms)
+        positionMs = ms
+    }
+
+    // ───────── Account Google ─────────
+
+    fun connectGoogle(cookie: String) {
+        store.setGoogleCookie(cookie)
+        loginOpen = false
+        syncGoogle()
+    }
+
+    fun syncGoogle() {
+        val cookie = store.googleCookie ?: return
+        if (syncState == SyncState.Running) return
+        syncState = SyncState.Running
+        syncError = null
+        syncStatus = ""
+        viewModelScope.launch {
+            try {
+                val imported = GoogleSync.importAll(cookie) { syncStatus = it }
+                store.replaceGooglePlaylists(imported)
+                syncState = SyncState.Done
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                syncError = e.message ?: "Sincronizzazione non riuscita"
+                syncState = SyncState.Failed
+            }
         }
+    }
+
+    fun disconnectGoogle() {
+        store.setGoogleCookie(null)
+        syncState = SyncState.Idle
+        syncError = null
+        CookieManager.getInstance().removeAllCookies(null)
+    }
+
+    fun finishOnboarding(name: String) {
+        store.completeOnboarding(name)
     }
 
     override fun onCleared() {

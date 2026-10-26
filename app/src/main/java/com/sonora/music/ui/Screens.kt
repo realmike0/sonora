@@ -2,13 +2,16 @@
 
 package com.sonora.music.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -25,7 +28,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -39,31 +41,36 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -75,56 +82,130 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import androidx.core.content.ContextCompat
 import com.sonora.music.PlayerViewModel
 import com.sonora.music.Track
-import java.util.Locale
+import com.sonora.music.toTrack
 import kotlin.math.PI
 import kotlin.math.sin
 
 // Molla "gommosa" usata da quasi tutte le animazioni.
 private const val BOUNCY = Spring.DampingRatioMediumBouncy
 
+/** Radice dell'app: onboarding al primo avvio, poi l'app vera. Il login Google sta sopra a tutto. */
+@Composable
+fun SonoraRoot(vm: PlayerViewModel) {
+    Box(Modifier.fillMaxSize()) {
+        Crossfade(
+            targetState = vm.store.onboarded,
+            animationSpec = tween(700),
+            label = "root"
+        ) { done ->
+            if (done) SonoraScreen(vm) else OnboardingScreen(vm)
+        }
+
+        AnimatedVisibility(
+            visible = vm.loginOpen,
+            enter = slideInVertically(spring(BOUNCY, Spring.StiffnessLow)) { it } + fadeIn(),
+            exit = slideOutVertically { it } + fadeOut()
+        ) {
+            GoogleLoginScreen(
+                onCookie = { vm.connectGoogle(it) },
+                onClose = { vm.loginOpen = false }
+            )
+        }
+    }
+}
+
 @Composable
 fun SonoraScreen(vm: PlayerViewModel) {
-    var showPlayer by remember { mutableStateOf(false) }
+    var tab by rememberSaveable { mutableStateOf(0) }
+    AskNotificationPermission()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            AnimatedVisibility(
-                visible = vm.nowPlaying != null,
-                enter = slideInVertically(spring(BOUNCY, Spring.StiffnessLow)) { it } + fadeIn(),
-                exit = slideOutVertically { it } + fadeOut()
-            ) {
-                MiniPlayer(vm, onOpen = { showPlayer = true })
+            Column {
+                AnimatedVisibility(
+                    visible = vm.nowPlaying != null,
+                    enter = slideInVertically(spring(BOUNCY, Spring.StiffnessLow)) { it } + fadeIn(),
+                    exit = slideOutVertically { it } + fadeOut()
+                ) {
+                    MiniPlayer(vm, onOpen = { vm.playerOpen = true })
+                }
+                NavigationBar {
+                    NavigationBarItem(
+                        selected = tab == 0,
+                        onClick = { tab = 0 },
+                        icon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                        label = { Text("Cerca") }
+                    )
+                    NavigationBarItem(
+                        selected = tab == 1,
+                        onClick = { tab = 1 },
+                        icon = { Icon(Icons.Rounded.LibraryMusic, contentDescription = null) },
+                        label = { Text("Libreria") }
+                    )
+                    NavigationBarItem(
+                        selected = tab == 2,
+                        onClick = { tab = 2 },
+                        icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
+                        label = { Text("Impostazioni") }
+                    )
+                }
             }
         }
     ) { padding ->
-        SearchContent(vm, Modifier.padding(padding))
+        AnimatedContent(
+            targetState = tab,
+            transitionSpec = {
+                (fadeIn(tween(250, delayMillis = 60)) + scaleIn(initialScale = 0.96f)) togetherWith
+                    fadeOut(tween(120))
+            },
+            label = "tabs"
+        ) { t ->
+            when (t) {
+                0 -> SearchContent(vm, Modifier.padding(padding))
+                1 -> LibraryScreen(vm, Modifier.padding(padding))
+                else -> SettingsScreen(vm, Modifier.padding(padding))
+            }
+        }
     }
 
-    if (showPlayer && vm.nowPlaying != null) {
-        PlayerSheet(vm, onDismiss = { showPlayer = false })
+    if (vm.playerOpen && vm.nowPlaying != null) {
+        PlayerSheet(vm, onDismiss = { vm.playerOpen = false })
+    }
+}
+
+/** Android 13+: serve il permesso per mostrare la notifica dei controlli multimediali. */
+@Composable
+private fun AskNotificationPermission() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }
 
@@ -132,12 +213,22 @@ fun SonoraScreen(vm: PlayerViewModel) {
 
 @Composable
 private fun SearchContent(vm: PlayerViewModel, modifier: Modifier = Modifier) {
+    var addTrack by remember { mutableStateOf<Track?>(null) }
+
     Column(modifier.fillMaxSize()) {
         Text(
             text = "Sonora",
             style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold),
             modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp)
         )
+        if (vm.store.userName.isNotBlank()) {
+            Text(
+                text = "Ciao, ${vm.store.userName}",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+        }
         SearchField(vm)
 
         when {
@@ -154,13 +245,18 @@ private fun SearchContent(vm: PlayerViewModel, modifier: Modifier = Modifier) {
                     TrackRow(
                         track = track,
                         selected = vm.nowPlaying?.id == track.id,
+                        liked = vm.store.isLiked(track.id),
                         onClick = { vm.playFrom(index) },
+                        onLike = { vm.store.toggleLike(track) },
+                        onMore = { addTrack = track },
                         modifier = Modifier.animateItem()
                     )
                 }
             }
         }
     }
+
+    addTrack?.let { AddToPlaylistDialog(vm.store, it) { addTrack = null } }
 }
 
 @Composable
@@ -197,116 +293,6 @@ private fun SearchField(vm: PlayerViewModel) {
     )
 }
 
-@Composable
-private fun Message(text: String) {
-    Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-/** Tre palline che rimbalzano a ondate. */
-@Composable
-private fun BouncyLoader() {
-    val transition = rememberInfiniteTransition(label = "loader")
-    val colors = listOf(
-        MaterialTheme.colorScheme.primary,
-        MaterialTheme.colorScheme.secondary,
-        MaterialTheme.colorScheme.tertiary
-    )
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        colors.forEachIndexed { i, color ->
-            val y by transition.animateFloat(
-                initialValue = 0f,
-                targetValue = -24f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(420, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse,
-                    initialStartOffset = StartOffset(i * 140)
-                ),
-                label = "dot$i"
-            )
-            Box(
-                Modifier
-                    .size(18.dp)
-                    .offset(y = y.dp)
-                    .background(color, CircleShape)
-            )
-        }
-    }
-}
-
-@Composable
-private fun TrackRow(
-    track: Track,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val source = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.95f else 1f,
-        animationSpec = spring(BOUNCY, Spring.StiffnessMedium),
-        label = "rowPress"
-    )
-    // Il brano in riproduzione si "gonfia": angoli più tondi.
-    val corner by animateDpAsState(
-        targetValue = if (selected) 44.dp else 24.dp,
-        animationSpec = spring(BOUNCY, Spring.StiffnessLow),
-        label = "rowCorner"
-    )
-
-    Surface(
-        onClick = onClick,
-        interactionSource = source,
-        shape = RoundedCornerShape(corner),
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 2.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-    ) {
-        Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Artwork(track.thumb, Modifier.size(56.dp), RoundedCornerShape(16.dp))
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    track.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    track.artist,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            if (track.durationSec > 0) {
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    formatTime(track.durationSec * 1000),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
 // ───────────────────────── Player ─────────────────────────
 
 @Composable
@@ -318,13 +304,13 @@ private fun MiniPlayer(vm: PlayerViewModel, onOpen: () -> Unit) {
         shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(Modifier.navigationBarsPadding()) {
+        Column {
             Row(
                 Modifier.padding(start = 16.dp, top = 12.dp, end = 12.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Artwork(np.artwork, Modifier.size(52.dp), RoundedCornerShape(16.dp))
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.size(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
                         np.title,
@@ -406,6 +392,8 @@ private fun WavyProgress(progress: Float, playing: Boolean, modifier: Modifier =
 private fun PlayerSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
     val np = vm.nowPlaying ?: return
     val playing = vm.wantsPlay
+    var showLyrics by remember { mutableStateOf(false) }
+    var addTrack by remember { mutableStateOf<Track?>(null) }
 
     // La copertina "respira": si rimpicciolisce e si arrotonda in pausa.
     val artScale by animateFloatAsState(
@@ -426,22 +414,38 @@ private fun PlayerSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
         Column(
             Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
                 .padding(horizontal = 28.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Artwork(
-                np.artwork,
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .graphicsLayer {
-                        scaleX = artScale
-                        scaleY = artScale
-                    },
-                RoundedCornerShape(artCorner.coerceAtLeast(0.dp))
-            )
-            Spacer(Modifier.height(24.dp))
+            AnimatedContent(
+                targetState = showLyrics,
+                transitionSpec = {
+                    (fadeIn(tween(300)) + scaleIn(initialScale = 0.9f)) togetherWith
+                        (fadeOut(tween(150)) + scaleOut(targetScale = 0.9f))
+                },
+                label = "artOrLyrics"
+            ) { lyricsMode ->
+                if (lyricsMode) {
+                    LyricsPanel(vm, Modifier.fillMaxWidth(0.88f).aspectRatio(1f))
+                } else {
+                    Box(Modifier.fillMaxWidth(0.88f).aspectRatio(1f)) {
+                        Artwork(
+                            np.artwork,
+                            Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    scaleX = artScale
+                                    scaleY = artScale
+                                },
+                            RoundedCornerShape(artCorner.coerceAtLeast(0.dp))
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
             Text(
                 np.title,
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
@@ -456,7 +460,21 @@ private fun PlayerSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(Modifier.height(16.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                LikeButton(liked = vm.store.isLiked(np.id), onClick = { vm.store.toggleLike(np.toTrack()) })
+                FilterChip(
+                    selected = showLyrics,
+                    onClick = { showLyrics = !showLyrics },
+                    label = { Text("Testi") }
+                )
+                IconButton(onClick = { addTrack = np.toTrack() }) {
+                    Icon(Icons.Rounded.Add, contentDescription = "Aggiungi a playlist")
+                }
+            }
 
             var dragging by remember { mutableStateOf<Float?>(null) }
             Slider(
@@ -489,6 +507,8 @@ private fun PlayerSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
             Spacer(Modifier.height(24.dp))
         }
     }
+
+    addTrack?.let { AddToPlaylistDialog(vm.store, it) { addTrack = null } }
 }
 
 /**
@@ -560,30 +580,4 @@ private fun BouncyTonalButton(
         },
         content = content
     )
-}
-
-@Composable
-private fun Artwork(url: String?, modifier: Modifier, shape: Shape) {
-    Box(
-        modifier
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center
-    ) {
-        if (url == null) {
-            Icon(Icons.Rounded.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-    }
-}
-
-private fun formatTime(ms: Long): String {
-    val total = (ms / 1000).coerceAtLeast(0)
-    return String.format(Locale.getDefault(), "%d:%02d", total / 60, total % 60)
 }

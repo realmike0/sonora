@@ -29,6 +29,7 @@ fun Track.toMediaItem(): MediaItem =
                 .setTitle(title)
                 .setArtist(artist)
                 .setArtworkUri(thumb?.let(Uri::parse))
+                .setDurationMs(durationSec * 1000)
                 .build()
         )
         .build()

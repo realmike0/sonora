@@ -1,5 +1,6 @@
 package com.sonora.music
 
+import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
 import androidx.media3.common.AudioAttributes
@@ -87,7 +88,17 @@ class PlaybackService : MediaSessionService() {
             }
         })
 
+        // Tocco sulla copertina/notifica: apre l'app sulla schermata principale (mai sul player).
+        val openApp = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
         session = MediaSession.Builder(this, player)
+            .setSessionActivity(openApp)
             .setCallback(object : MediaSession.Callback {
                 // I controller inviano solo mediaId + metadati: qui aggiungiamo l'URI.
                 override fun onAddMediaItems(
