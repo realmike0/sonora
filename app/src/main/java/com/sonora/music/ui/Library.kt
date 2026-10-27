@@ -65,7 +65,7 @@ import com.sonora.music.PlayerViewModel
 import com.sonora.music.Track
 
 @Composable
-fun LibraryScreen(vm: PlayerViewModel, modifier: Modifier = Modifier) {
+fun LibraryScreen(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {
     var openId by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(enabled = openId != null) { openId = null }
 
@@ -80,22 +80,22 @@ fun LibraryScreen(vm: PlayerViewModel, modifier: Modifier = Modifier) {
             label = "library"
         ) { id ->
             if (id == null) {
-                LibraryHome(vm, onOpen = { openId = it })
+                LibraryHome(vm, bottomPad, onOpen = { openId = it })
             } else {
-                PlaylistDetail(vm, id, onBack = { openId = null })
+                PlaylistDetail(vm, id, bottomPad, onBack = { openId = null })
             }
         }
     }
 }
 
 @Composable
-private fun LibraryHome(vm: PlayerViewModel, onOpen: (String) -> Unit) {
+private fun LibraryHome(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit.Dp, onOpen: (String) -> Unit) {
     val store = vm.store
     var showNew by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = bottomPad + 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
@@ -253,7 +253,7 @@ private fun PlaylistCard(
 }
 
 @Composable
-private fun PlaylistDetail(vm: PlayerViewModel, id: String, onBack: () -> Unit) {
+private fun PlaylistDetail(vm: PlayerViewModel, id: String, bottomPad: androidx.compose.ui.unit.Dp, onBack: () -> Unit) {
     val store = vm.store
     val isLikedList = id == LIKED_ID
     val isCache = id == CACHE_ID
@@ -322,7 +322,7 @@ private fun PlaylistDetail(vm: PlayerViewModel, id: String, onBack: () -> Unit) 
                 }
             )
         } else {
-            LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
+            LazyColumn(contentPadding = PaddingValues(bottom = bottomPad + 16.dp)) {
                 itemsIndexed(tracks, key = { _, t -> t.id }) { index, track ->
                     TrackRow(
                         track = track,

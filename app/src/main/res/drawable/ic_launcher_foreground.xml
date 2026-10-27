@@ -4,14 +4,12 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Tutto dentro la zona sicura centrale (66dp) -->
-    <group
-        android:scaleX="2.6"
-        android:scaleY="2.6"
-        android:translateX="22.8"
-        android:translateY="22.8">
-        <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M12,3v10.55c-0.59,-0.34 -1.27,-0.55 -2,-0.55 -2.21,0 -4,1.79 -4,4s1.79,4 4,4 4,-1.79 4,-4V7h4V3h-6z" />
+    <!-- "S" poligonale con la nota musicale nel mezzo. Tutto dentro la zona sicura (66dp). -->
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="0.8" android:scaleY="0.8">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M24,28 L32,20 L76,20 L84,28 L84,34 L38,34 L38,47 L76,47 L84,55 L84,80 L76,88 L32,88 L24,80 L24,74 L70,74 L70,61 L32,61 L24,53 Z" />
+        <group android:scaleX="1.25" android:scaleY="1.25" android:translateX="39" android:translateY="39">
+            <path android:fillColor="#FFFFD8E4" android:pathData="M17.36,-0.93 L24.93,6.64 L24.93,17.36 L17.36,24.93 L6.64,24.93 L-0.93,17.36 L-0.93,6.64 L6.64,-0.93 Z" />
+            <path android:fillColor="#FF4F378B" android:pathData="M12,3v10.55c-0.59,-0.34 -1.27,-0.55 -2,-0.55 -2.21,0 -4,1.79 -4,4s1.79,4 4,4 4,-1.79 4,-4V7h4V3h-6z" />
+        </group>
     </group>
 </vector>

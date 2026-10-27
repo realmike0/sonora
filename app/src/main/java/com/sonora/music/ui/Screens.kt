@@ -29,6 +29,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -83,6 +84,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -90,6 +92,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -102,7 +105,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.core.content.ContextCompat
 import com.sonora.music.PlayerViewModel
 import com.sonora.music.Track
@@ -116,6 +122,12 @@ private const val BOUNCY = Spring.DampingRatioMediumBouncy
 /** Radice dell'app: onboarding al primo avvio, poi l'app vera. Il login Google sta sopra a tutto. */
 @Composable
 fun SonoraRoot(vm: PlayerViewModel) {
+    var splash by rememberSaveable { mutableStateOf(true) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(1400)
+        splash = false
+    }
+
     Box(Modifier.fillMaxSize()) {
         Crossfade(
             targetState = vm.store.onboarded,
@@ -144,6 +156,8 @@ fun SonoraRoot(vm: PlayerViewModel) {
                 onClose = { vm.loginOpen = false }
             )
         }
+
+        SplashOverlay(visible = splash)
     }
 }
 
@@ -154,9 +168,37 @@ fun SonoraScreen(vm: PlayerViewModel) {
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { TopBar(vm) },
-        bottomBar = {
-            Column {
+        topBar = { TopBar(vm) }
+    ) { padding ->
+        // Altezza di mini player + barra fluttuante: serve alle liste per non finirci sotto.
+        var overlayPx by remember { mutableIntStateOf(0) }
+        val bottomPad = with(LocalDensity.current) { overlayPx.toDp() }
+
+        Box(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
+            AnimatedContent(
+                targetState = tab,
+                transitionSpec = {
+                    fadeIn(tween(200, delayMillis = 40)) togetherWith fadeOut(tween(100))
+                },
+                label = "tabs"
+            ) { t ->
+                when (t) {
+                    0 -> HomeScreen(vm, bottomPad)
+                    1 -> SearchContent(vm, bottomPad)
+                    else -> LibraryScreen(vm, bottomPad)
+                }
+            }
+
+            val bg = MaterialTheme.colorScheme.background
+            Column(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .onSizeChanged { overlayPx = it.height }
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, bg.copy(alpha = 0.92f))))
+                    .navigationBarsPadding()
+                    .padding(top = 12.dp, bottom = 12.dp)
+            ) {
                 AnimatedVisibility(
                     visible = vm.nowPlaying != null,
                     enter = slideInVertically(spring(BOUNCY, Spring.StiffnessLow)) { it } + fadeIn(),
@@ -164,40 +206,7 @@ fun SonoraScreen(vm: PlayerViewModel) {
                 ) {
                     MiniPlayer(vm, onOpen = { vm.playerOpen = true })
                 }
-                NavigationBar {
-                    NavigationBarItem(
-                        selected = tab == 0,
-                        onClick = { tab = 0 },
-                        icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
-                        label = { Text("Home") }
-                    )
-                    NavigationBarItem(
-                        selected = tab == 1,
-                        onClick = { tab = 1 },
-                        icon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                        label = { Text("Ricerca") }
-                    )
-                    NavigationBarItem(
-                        selected = tab == 2,
-                        onClick = { tab = 2 },
-                        icon = { Icon(Icons.Rounded.LibraryMusic, contentDescription = null) },
-                        label = { Text("Raccolta") }
-                    )
-                }
-            }
-        }
-    ) { padding ->
-        AnimatedContent(
-            targetState = tab,
-            transitionSpec = {
-                fadeIn(tween(200, delayMillis = 40)) togetherWith fadeOut(tween(100))
-            },
-            label = "tabs"
-        ) { t ->
-            when (t) {
-                0 -> HomeScreen(vm, 0.dp, Modifier.padding(padding))
-                1 -> SearchContent(vm, Modifier.padding(padding))
-                else -> LibraryScreen(vm, Modifier.padding(padding))
+                FloatingNavBar(selected = tab, onSelect = { tab = it })
             }
         }
     }
@@ -271,7 +280,7 @@ private fun AskNotificationPermission() {
 // ───────────────────────── Ricerca ─────────────────────────
 
 @Composable
-private fun SearchContent(vm: PlayerViewModel, modifier: Modifier = Modifier) {
+private fun SearchContent(vm: PlayerViewModel, bottomPad: Dp, modifier: Modifier = Modifier) {
     val store = vm.store
 
     Column(modifier.fillMaxSize()) {
@@ -283,7 +292,7 @@ private fun SearchContent(vm: PlayerViewModel, modifier: Modifier = Modifier) {
             }
 
             // Risultati della ricerca in corso.
-            vm.results.isNotEmpty() && vm.query.isNotBlank() -> TrackList(vm, vm.results, fromSearch = true)
+            vm.results.isNotEmpty() && vm.query.isNotBlank() -> TrackList(vm, vm.results, fromSearch = true, bottomPad = bottomPad)
 
             vm.error != null && vm.query.isNotBlank() -> Message(vm.error ?: "")
 
@@ -300,15 +309,15 @@ private fun SearchContent(vm: PlayerViewModel, modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 4.dp)
                 )
-                TrackList(vm, store.searchPlays.toList(), fromSearch = false)
+                TrackList(vm, store.searchPlays.toList(), fromSearch = false, bottomPad = bottomPad)
             }
         }
     }
 }
 
 @Composable
-private fun TrackList(vm: PlayerViewModel, tracks: List<Track>, fromSearch: Boolean) {
-    LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
+private fun TrackList(vm: PlayerViewModel, tracks: List<Track>, fromSearch: Boolean, bottomPad: Dp) {
+    LazyColumn(contentPadding = PaddingValues(bottom = bottomPad + 16.dp)) {
         itemsIndexed(tracks, key = { _, t -> t.id }) { index, track ->
             TrackRow(
                 track = track,
@@ -365,8 +374,11 @@ private fun MiniPlayer(vm: PlayerViewModel, onOpen: () -> Unit) {
     Surface(
         onClick = onOpen,
         color = MaterialTheme.colorScheme.secondaryContainer,
-        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
-        modifier = Modifier.fillMaxWidth()
+        shape = RoundedCornerShape(32.dp),
+        shadowElevation = 6.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, bottom = 10.dp)
     ) {
         Column {
             Row(

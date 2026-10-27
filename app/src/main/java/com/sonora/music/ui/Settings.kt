@@ -64,12 +64,13 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
         }
     }
 
+    val typography = MaterialTheme.typography
     // Schermata sempre scura con i colori dinamici del telefono: testo chiaro e leggibile.
     val scheme = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) dynamicDarkColorScheme(context) else darkColorScheme()
     }
 
-    MaterialTheme(colorScheme = scheme) {
+    MaterialTheme(colorScheme = scheme, typography = typography) {
     Surface(
         color = scheme.background,
         contentColor = scheme.onBackground,

@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.sonora.music.ui.SonoraRoot
 import com.sonora.music.ui.SonoraTheme
 
@@ -14,6 +15,8 @@ class MainActivity : ComponentActivity() {
     private val vm: PlayerViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Splash di sistema con i colori dinamici; poi la splash dell'app prende il suo posto senza stacchi.
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
