@@ -30,6 +30,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -44,7 +49,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -72,7 +76,7 @@ fun AuroraBackground(modifier: Modifier = Modifier) {
         label = "phase"
     )
 
-    Box(modifier.fillMaxSize().background(scheme.background)) {
+    Box(modifier.fillMaxSize().background(lerp(scheme.primary, Color.Black, 0.72f))) {
         Canvas(Modifier.fillMaxSize().blur(48.dp)) {
             val w = size.width
             val h = size.height
@@ -97,7 +101,7 @@ fun AuroraBackground(modifier: Modifier = Modifier) {
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        listOf(scheme.background.copy(alpha = 0f), scheme.background.copy(alpha = 0.35f))
+                        listOf(Color.Black.copy(alpha = 0.05f), Color.Black.copy(alpha = 0.35f))
                     )
                 )
         )
@@ -118,8 +122,12 @@ fun OnboardingScreen(vm: PlayerViewModel) {
         }
     }
 
+    // Testo chiaro tinto con il colore dinamico del telefono (leggibile sullo sfondo scuro).
+    val light = lerp(Color.White, MaterialTheme.colorScheme.primary, 0.22f)
+
     Box(Modifier.fillMaxSize()) {
         AuroraBackground()
+        CompositionLocalProvider(LocalContentColor provides light) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -158,6 +166,7 @@ fun OnboardingScreen(vm: PlayerViewModel) {
                 }
             }
         }
+        }
     }
 }
 
@@ -187,8 +196,13 @@ private fun NameStep(name: String, onName: (String) -> Unit, onNext: () -> Unit)
                     unfocusedIndicatorColor = Color.Transparent,
                     disabledIndicatorColor = Color.Transparent,
                     errorIndicatorColor = Color.Transparent,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                    focusedContainerColor = LocalContentColor.current.copy(alpha = 0.16f),
+                    unfocusedContainerColor = LocalContentColor.current.copy(alpha = 0.12f),
+                    focusedTextColor = LocalContentColor.current,
+                    unfocusedTextColor = LocalContentColor.current,
+                    cursorColor = LocalContentColor.current,
+                    focusedPlaceholderColor = LocalContentColor.current.copy(alpha = 0.6f),
+                    unfocusedPlaceholderColor = LocalContentColor.current.copy(alpha = 0.6f)
                 ),
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Words,
@@ -201,6 +215,7 @@ private fun NameStep(name: String, onName: (String) -> Unit, onNext: () -> Unit)
         Spacer(Modifier.height(16.dp))
         Reveal(enabled = titleDone, delayMs = 250, modifier = Modifier.fillMaxWidth()) {
             Button(
+                colors = onbButtonColors(),
                 onClick = onNext,
                 enabled = name.isNotBlank(),
                 modifier = Modifier.fillMaxWidth().height(56.dp)
@@ -211,7 +226,7 @@ private fun NameStep(name: String, onName: (String) -> Unit, onNext: () -> Unit)
             Text(
                 "Te lo chiediamo una volta sola.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = LocalContentColor.current.copy(alpha = 0.78f)
             )
         }
     }
@@ -245,20 +260,21 @@ private fun GoogleStep(name: String, onConnect: () -> Unit, onSkip: () -> Unit) 
         Spacer(Modifier.height(32.dp))
         Reveal(enabled = questionDone, modifier = Modifier.fillMaxWidth()) {
             Button(
+                colors = onbButtonColors(),
                 onClick = onConnect,
                 modifier = Modifier.fillMaxWidth().height(56.dp)
             ) { Text("Collega account Google") }
         }
         Spacer(Modifier.height(8.dp))
         Reveal(enabled = questionDone, delayMs = 200) {
-            TextButton(onClick = onSkip) { Text("Salta") }
+            TextButton(onClick = onSkip, colors = onbTextButtonColors()) { Text("Salta") }
         }
         Spacer(Modifier.height(8.dp))
         Reveal(enabled = questionDone, delayMs = 400) {
             Text(
                 "Se salti, creiamo un profilo locale: Mi piace e playlist restano su questo telefono.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = LocalContentColor.current.copy(alpha = 0.78f),
                 textAlign = TextAlign.Center
             )
         }
@@ -280,18 +296,19 @@ private fun SyncStep(vm: PlayerViewModel, name: String) {
                 Text(
                     vm.syncError ?: "Sincronizzazione non riuscita",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
+                    color = lerp(Color.White, MaterialTheme.colorScheme.error, 0.4f),
                     textAlign = TextAlign.Center
                 )
                 Spacer(Modifier.height(24.dp))
                 Reveal(delayMs = 600, modifier = Modifier.fillMaxWidth()) {
                     Button(
+                        colors = onbButtonColors(),
                         onClick = { vm.syncGoogle() },
                         modifier = Modifier.fillMaxWidth().height(56.dp)
                     ) { Text("Riprova") }
                 }
                 Reveal(delayMs = 800) {
-                    TextButton(onClick = {
+                    TextButton(colors = onbTextButtonColors(), onClick = {
                         vm.disconnectGoogle()
                         vm.finishOnboarding(name)
                     }) { Text("Continua senza account Google") }
@@ -320,10 +337,22 @@ private fun SyncStep(vm: PlayerViewModel, name: String) {
                 Text(
                     vm.syncStatus,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = LocalContentColor.current.copy(alpha = 0.78f),
                     textAlign = TextAlign.Center
                 )
             }
         }
     }
 }
+
+/** Pulsanti chiari con testo scuro tinto dinamico: restano leggibili sullo sfondo scuro. */
+@Composable
+private fun onbButtonColors() = ButtonDefaults.buttonColors(
+    containerColor = LocalContentColor.current,
+    contentColor = lerp(MaterialTheme.colorScheme.primary, Color.Black, 0.65f),
+    disabledContainerColor = LocalContentColor.current.copy(alpha = 0.25f),
+    disabledContentColor = LocalContentColor.current.copy(alpha = 0.5f)
+)
+
+@Composable
+private fun onbTextButtonColors() = ButtonDefaults.textButtonColors(contentColor = LocalContentColor.current)

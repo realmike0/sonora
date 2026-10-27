@@ -3,6 +3,7 @@ package com.sonora.music
 import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import com.sonora.music.ui.sized
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.ServiceList
@@ -11,6 +12,9 @@ import org.schabi.newpipe.extractor.stream.DeliveryMethod
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import java.io.IOException
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 data class Track(
@@ -28,13 +32,37 @@ fun Track.toMediaItem(): MediaItem =
             MediaMetadata.Builder()
                 .setTitle(title)
                 .setArtist(artist)
-                .setArtworkUri(thumb?.let(Uri::parse))
+                .setArtworkUri(thumb?.sized(544)?.let(Uri::parse))
                 .setDurationMs(durationSec * 1000)
                 .build()
         )
         .build()
 
+/** Informazioni extra sul brano, mostrate nel menu a tendina. */
+data class TrackDetails(val published: String?, val views: Long?)
+
 object MusicRepository {
+
+    private val detailsCache = ConcurrentHashMap<String, TrackDetails>()
+
+    private fun StreamInfo.toDetails(): TrackDetails {
+        val date = runCatching {
+            uploadDate?.offsetDateTime()?.toLocalDate()
+                ?.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(Locale.ITALY))
+        }.getOrNull() ?: textualUploadDate
+        return TrackDetails(date?.takeIf { it.isNotBlank() }, viewCount.takeIf { it >= 0 })
+    }
+
+    /** Data di pubblicazione e visualizzazioni (con cache in memoria). */
+    suspend fun details(videoId: String): TrackDetails? = withContext(Dispatchers.IO) {
+        detailsCache[videoId]?.let { return@withContext it }
+        try {
+            val info = StreamInfo.getInfo(ServiceList.YouTube, "https://www.youtube.com/watch?v=$videoId")
+            info.toDetails().also { detailsCache[videoId] = it }
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     private const val STREAM_TTL_MS = 3 * 60 * 60 * 1000L // gli URL di YouTube scadono dopo ~6h
 
@@ -89,7 +117,7 @@ object MusicRepository {
             id = id,
             title = name,
             artist = (uploaderName ?: "").removeSuffix(" - Topic"),
-            thumb = thumbnails.lastOrNull()?.url,
+            thumb = thumbnails.maxByOrNull { it.height }?.url ?: thumbnails.lastOrNull()?.url,
             durationSec = duration
         )
     }

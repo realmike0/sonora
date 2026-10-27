@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sonora.music
 
 import android.app.Application
@@ -40,6 +42,20 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     // --- Navigazione ---
     var playerOpen by mutableStateOf(false)
     var loginOpen by mutableStateOf(false)
+    var settingsOpen by mutableStateOf(false)
+
+    /** Brano di cui è aperto il menu (pressione prolungata). */
+    var menuTrack by mutableStateOf<Track?>(null)
+
+    // --- Home ---
+    var home by mutableStateOf<HomeData?>(null)
+        private set
+    var homeLoading by mutableStateOf(false)
+        private set
+    var homeError by mutableStateOf<String?>(null)
+        private set
+    private var homeJob: Job? = null
+    private var queueFromSearch = false
 
     // --- Ricerca ---
     var query by mutableStateOf("")
@@ -100,6 +116,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             sync(c)
         }, ContextCompat.getMainExecutor(context))
 
+        home = HomeRepository.loadCached(app.filesDir)
+        loadHome()
+        refreshAccount()
+
         // Aggiorna la posizione mentre si ascolta (serve anche ai testi sincronizzati).
         viewModelScope.launch {
             while (true) {
@@ -122,6 +142,11 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 artwork = it.mediaMetadata.artworkUri?.toString(),
                 durationSec = (it.mediaMetadata.durationMs ?: 0L) / 1000
             )
+        }
+        if (np?.id != nowPlaying?.id && np != null) {
+            val track = np.toTrack()
+            store.recordPlayed(track)
+            if (queueFromSearch) store.recordSearchPlay(track)
         }
         nowPlaying = np
         if (np?.id != lyricsFor) {
@@ -157,6 +182,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         val q = query.trim()
         if (q.isEmpty()) return
         searchJob?.cancel()
+        store.markSearched()
         searchJob = viewModelScope.launch {
             loading = true
             error = null
@@ -174,15 +200,16 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun play(tracks: List<Track>, index: Int) {
+    fun play(tracks: List<Track>, index: Int, fromSearch: Boolean = false) {
         val c = controller ?: return
         if (tracks.isEmpty()) return
+        queueFromSearch = fromSearch
         c.setMediaItems(tracks.map { it.toMediaItem() }, index.coerceIn(0, tracks.lastIndex), 0L)
         c.prepare()
         c.play()
     }
 
-    fun playFrom(index: Int) = play(results, index)
+    fun playFrom(index: Int) = play(results, index, fromSearch = true)
 
     fun togglePlay() {
         val c = controller ?: return
@@ -207,12 +234,54 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         positionMs = ms
     }
 
+    // ───────── Home ─────────
+
+    fun loadHome(force: Boolean = false) {
+        val cached = home
+        if (!force && cached != null && cached.day == HomeRepository.today()) return
+        if (homeJob?.isActive == true) return
+        homeJob = viewModelScope.launch {
+            homeLoading = true
+            homeError = null
+            try {
+                val personal = store.liked.toList() + store.played.take(30)
+                val data = HomeRepository.load(store.googleCookie, personal)
+                home = data
+                HomeRepository.saveCached(getApplication<Application>().filesDir, data)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (home == null) homeError = "Impossibile caricare la Home: ${e.message ?: e.javaClass.simpleName}"
+            } finally {
+                homeLoading = false
+            }
+        }
+    }
+
+    // ───────── Download ─────────
+
+    fun download(track: Track) {
+        store.remember(track)
+        AudioStore.download(track)
+    }
+
+    fun removeOffline(id: String) = AudioStore.remove(id)
+
     // ───────── Account Google ─────────
+
+    private fun refreshAccount() {
+        val cookie = store.googleCookie ?: return
+        viewModelScope.launch {
+            GoogleSync.fetchAccount(cookie)?.let { store.updateAccount(it.name, it.photo) }
+        }
+    }
 
     fun connectGoogle(cookie: String) {
         store.updateGoogleCookie(cookie)
         loginOpen = false
+        refreshAccount()
         syncGoogle()
+        loadHome(force = true)
     }
 
     fun syncGoogle() {
@@ -237,6 +306,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     fun disconnectGoogle() {
         store.updateGoogleCookie(null)
+        store.updateAccount(null, null)
         syncState = SyncState.Idle
         syncError = null
         CookieManager.getInstance().removeAllCookies(null)

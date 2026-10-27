@@ -52,6 +52,24 @@ object GoogleSync {
             result
         }
 
+    data class Account(val name: String?, val photo: String?)
+
+    /** Nome e foto profilo dell'account collegato (menu account di YouTube Music). */
+    suspend fun fetchAccount(cookie: String): Account? = withContext(Dispatchers.IO) {
+        try {
+            val json = post(cookie, null, null, "$ORIGIN/youtubei/v1/account/account_menu")
+            val headers = mutableListOf<JSONObject>()
+            collect(json, "activeAccountHeaderRenderer", headers)
+            val h = headers.firstOrNull() ?: return@withContext null
+            val thumbs = h.at("accountPhoto", "thumbnails") as? JSONArray
+            val photo = thumbs?.optJSONObject(thumbs.length() - 1)?.optString("url")?.takeIf { it.isNotEmpty() }
+            val name = h.at("accountName", "runs", 0, "text") as? String
+            Account(name, photo)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     // ───────── Richieste ─────────
 
     private fun cookieValue(cookie: String, name: String): String? =
@@ -83,28 +101,33 @@ object GoogleSync {
         )
     }
 
-    private fun post(cookie: String, browseId: String?, token: String?): JSONObject {
+    internal fun post(cookie: String?, browseId: String?, token: String?, endpoint: String = BROWSE): JSONObject {
         val body = JSONObject().put("context", clientContext())
         if (browseId != null) body.put("browseId", browseId)
 
-        val url = StringBuilder("$BROWSE?alt=json")
+        val url = StringBuilder("$endpoint?alt=json")
         if (token != null) {
             val t = URLEncoder.encode(token, "UTF-8")
             url.append("&ctoken=").append(t).append("&continuation=").append(t)
         }
 
-        val fullCookie = if (cookie.contains("SOCS=")) cookie else "$cookie; SOCS=CAI"
-        val request = Request.Builder()
+        val builder = Request.Builder()
             .url(url.toString())
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .header("User-Agent", USER_AGENT)
             .header("Accept", "*/*")
             .header("Origin", ORIGIN)
             .header("X-Origin", ORIGIN)
-            .header("X-Goog-AuthUser", "0")
-            .header("Authorization", authHeader(cookie))
-            .header("Cookie", fullCookie)
-            .build()
+        if (cookie != null) {
+            val fullCookie = if (cookie.contains("SOCS=")) cookie else "$cookie; SOCS=CAI"
+            builder
+                .header("X-Goog-AuthUser", "0")
+                .header("Authorization", authHeader(cookie))
+                .header("Cookie", fullCookie)
+        } else {
+            builder.header("Cookie", "SOCS=CAI")
+        }
+        val request = builder.build()
 
         Http.client.newCall(request).execute().use { r ->
             val text = r.body?.string().orEmpty()
@@ -193,7 +216,7 @@ object GoogleSync {
         return out
     }
 
-    private fun parseDuration(text: String?): Long {
+    internal fun parseDuration(text: String?): Long {
         if (text.isNullOrBlank()) return 0L
         val parts = text.trim().split(":").mapNotNull { it.toLongOrNull() }
         return parts.fold(0L) { acc, p -> acc * 60 + p }
@@ -210,7 +233,7 @@ object GoogleSync {
     }
 
     /** Raccoglie, in tutto l'albero JSON, gli oggetti memorizzati sotto la chiave data. */
-    private fun collect(node: Any?, key: String, out: MutableList<JSONObject>) {
+    internal fun collect(node: Any?, key: String, out: MutableList<JSONObject>) {
         when (node) {
             is JSONObject -> {
                 val keys = node.keys()
@@ -224,7 +247,7 @@ object GoogleSync {
         }
     }
 
-    private fun firstString(node: Any?, key: String): String? {
+    internal fun firstString(node: Any?, key: String): String? {
         when (node) {
             is JSONObject -> {
                 val direct = node.opt(key)
@@ -241,7 +264,7 @@ object GoogleSync {
         return null
     }
 
-    private fun Any?.at(vararg path: Any): Any? {
+    internal fun Any?.at(vararg path: Any): Any? {
         var cur: Any? = this
         for (p in path) {
             cur = when (p) {

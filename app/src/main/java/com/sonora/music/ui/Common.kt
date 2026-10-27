@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalFoundationApi::class, androidx.media3.common.util.UnstableApi::class)
+
 package com.sonora.music.ui
 
 import androidx.compose.animation.core.Animatable
@@ -11,7 +13,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -35,7 +39,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,7 +72,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.sonora.music.AudioStore
 import com.sonora.music.Store
 import com.sonora.music.Track
 import kotlinx.coroutines.delay
@@ -76,8 +88,29 @@ fun formatTime(ms: Long): String {
     return String.format(Locale.getDefault(), "%d:%02d", total / 60, total % 60)
 }
 
+private val GOOGLE_SIZE = Regex("=(w\\d+-h\\d+|s\\d+)[^/=]*$")
+private val YT_FILE = Regex("/(default|mqdefault|hqdefault|sddefault|maxresdefault)\\.(jpg|webp)$")
+
+/**
+ * Le copertine arrivano piccole (es. 120–226 px): le richiediamo alla risoluzione che serve davvero,
+ * altrimenti risultano sgranate quando vengono ingrandite.
+ */
+fun String.sized(px: Int): String = when {
+    contains("googleusercontent.com") || contains("ggpht.com") ->
+        if (GOOGLE_SIZE.containsMatchIn(this)) replace(GOOGLE_SIZE, "=w$px-h$px-l90-rj") else this
+
+    contains("i.ytimg.com/vi") -> {
+        val base = substringBefore('?')
+        val file = if (px >= 480) "sddefault" else "hqdefault"
+        if (YT_FILE.containsMatchIn(base)) base.replace(YT_FILE, "/$file.jpg") else this
+    }
+
+    else -> this
+}
+
+/** [px] = lato in pixel che serve davvero: lista 256, riquadri 400, player 800. */
 @Composable
-fun Artwork(url: String?, modifier: Modifier, shape: Shape) {
+fun Artwork(url: String?, modifier: Modifier, shape: Shape, px: Int = 256) {
     Box(
         modifier
             .clip(shape)
@@ -87,8 +120,15 @@ fun Artwork(url: String?, modifier: Modifier, shape: Shape) {
         if (url == null) {
             Icon(Icons.Rounded.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
+            val context = LocalContext.current
+            val request = remember(url, px) {
+                ImageRequest.Builder(context)
+                    .data(url.sized(px))
+                    .size(px)
+                    .build()
+            }
             AsyncImage(
-                model = url,
+                model = request,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
@@ -247,42 +287,51 @@ fun TrackRow(
     modifier: Modifier = Modifier,
     trailing: (@Composable () -> Unit)? = null
 ) {
-    val source = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
-        targetValue = if (pressed) 0.96f else 1f,
-        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium),
-        label = "rowPress"
-    )
+    val haptic = LocalHapticFeedback.current
     val corner by androidx.compose.animation.core.animateDpAsState(
-        targetValue = if (selected) 44.dp else 24.dp,
+        targetValue = if (selected) 36.dp else 24.dp,
         animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow),
         label = "rowCorner"
     )
+    val shape = RoundedCornerShape(corner)
+    val downloaded = track.id in AudioStore.downloadedIds
+    val cached = track.id in AudioStore.cachedIds
 
-    Surface(
-        onClick = onClick,
-        interactionSource = source,
-        shape = RoundedCornerShape(corner),
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-        modifier = modifier
+    Row(
+        modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 2.dp)
-            .graphicsLayer {
-                scaleX = pressScale
-                scaleY = pressScale
-            }
+            .clip(shape)
+            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onMore()
+                }
+            )
+            .padding(start = 8.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(Modifier.padding(start = 8.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Artwork(track.thumb, Modifier.size(56.dp), RoundedCornerShape(16.dp))
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    track.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+        Artwork(track.thumb, Modifier.size(56.dp), RoundedCornerShape(16.dp), px = 192)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                track.title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (downloaded || cached) {
+                    Icon(
+                        if (downloaded) Icons.Rounded.Download else Icons.Rounded.Storage,
+                        contentDescription = if (downloaded) "Scaricato" else "In cache",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                }
                 val sub = if (track.durationSec > 0) "${track.artist} · ${formatTime(track.durationSec * 1000)}" else track.artist
                 Text(
                     sub,
@@ -292,12 +341,12 @@ fun TrackRow(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            LikeButton(liked = liked, onClick = onLike)
-            IconButton(onClick = onMore) {
-                Icon(Icons.Rounded.Add, contentDescription = "Aggiungi a playlist")
-            }
-            trailing?.invoke()
         }
+        LikeButton(liked = liked, onClick = onLike)
+        IconButton(onClick = onMore) {
+            Icon(Icons.Rounded.MoreVert, contentDescription = "Altro")
+        }
+        trailing?.invoke()
     }
 }
 

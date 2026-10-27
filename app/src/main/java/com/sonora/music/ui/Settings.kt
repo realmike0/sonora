@@ -1,6 +1,17 @@
 package com.sonora.music.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material3.FilterChip
+import com.sonora.music.AudioStore
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,23 +47,38 @@ import com.sonora.music.PlayerViewModel
 import com.sonora.music.Store
 import com.sonora.music.SyncState
 
+@OptIn(ExperimentalLayoutApi::class, androidx.media3.common.util.UnstableApi::class)
 @Composable
-fun SettingsScreen(vm: PlayerViewModel, modifier: Modifier = Modifier) {
+fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier = Modifier) {
     val store = vm.store
+    val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val version = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
+        } catch (e: Exception) {
+            "?"
+        }
+    }
 
-    Box(modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(
             Modifier
                 .fillMaxSize()
+                .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(start = 20.dp, end = 20.dp, bottom = 64.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                "Impostazioni",
-                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold),
-                modifier = Modifier.padding(top = 16.dp)
-            )
+            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onClose) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Indietro")
+                }
+                Text(
+                    "Impostazioni",
+                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold)
+                )
+            }
 
             SettingsCard("Profilo") {
                 Text(store.userName.ifBlank { "Ospite" }, style = MaterialTheme.typography.titleMedium)
@@ -69,6 +95,34 @@ fun SettingsScreen(vm: PlayerViewModel, modifier: Modifier = Modifier) {
 
             SettingsCard("Account Google") {
                 GoogleSection(vm)
+            }
+
+            SettingsCard("Memoria e cache") {
+                CacheSection()
+            }
+
+            SettingsCard("Community") {
+                Text(
+                    "Novità, aggiornamenti e supporto sul canale Telegram di Sonora.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Button(onClick = { uriHandler.openUri("https://t.me/sonoraclient") }) {
+                    Text("Apri su Telegram")
+                }
+                Text(
+                    "t.me/sonoraclient",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            SettingsCard("Informazioni") {
+                Text("Sonora $version", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Versione beta. I brani ascoltati vengono salvati in cache; quelli scaricati restano offline nella Raccolta.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
@@ -206,4 +260,69 @@ private fun Watermark(modifier: Modifier = Modifier) {
             modifier = Modifier.clickable { uriHandler.openUri("https://www.github.com/realmike0") }
         )
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class, androidx.media3.common.util.UnstableApi::class)
+@Composable
+private fun CacheSection() {
+    val limit = AudioStore.cacheLimitGb
+    var confirmClear by remember { mutableStateOf(false) }
+
+    Text(
+        "I brani che ascolti vengono salvati in automatico. Quando si supera il limite, " +
+            "vengono eliminati prima i meno recenti. I brani scaricati non vengono mai toccati.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+
+    val limitText = if (limit <= 0) "illimitata" else "$limit GB"
+    Text(
+        "In cache: ${formatBytes(AudioStore.cacheUsedBytes)} (limite $limitText)",
+        style = MaterialTheme.typography.titleMedium
+    )
+    Text(
+        "Scaricati: ${formatBytes(AudioStore.downloadsUsedBytes)}",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        listOf(1 to "1 GB", 2 to "2 GB", 5 to "5 GB", 10 to "10 GB", 0 to "Illimitata").forEach { (gb, label) ->
+            FilterChip(
+                selected = limit == gb,
+                onClick = { AudioStore.setCacheLimit(gb) },
+                label = { Text(label) }
+            )
+        }
+    }
+
+    OutlinedButton(onClick = { confirmClear = true }, enabled = AudioStore.cacheUsedBytes > 0) {
+        Text("Svuota cache")
+    }
+
+    if (confirmClear) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("Svuotare la cache?") },
+            text = { Text("I brani in cache verranno eliminati. I brani scaricati restano.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    confirmClear = false
+                    AudioStore.clearCache()
+                }) { Text("Svuota") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { confirmClear = false }) { Text("Annulla") }
+            }
+        )
+    }
+}
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1024L * 1024 * 1024 -> String.format(java.util.Locale.getDefault(), "%.1f GB", bytes / (1024.0 * 1024 * 1024))
+    bytes >= 1024L * 1024 -> String.format(java.util.Locale.getDefault(), "%d MB", bytes / (1024 * 1024))
+    else -> String.format(java.util.Locale.getDefault(), "%d KB", bytes / 1024)
 }

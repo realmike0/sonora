@@ -1,10 +1,11 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, androidx.media3.common.util.UnstableApi::class)
 
 package com.sonora.music.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -38,6 +39,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -57,6 +59,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SkipNext
@@ -123,6 +126,15 @@ fun SonoraRoot(vm: PlayerViewModel) {
         }
 
         AnimatedVisibility(
+            visible = vm.settingsOpen && vm.store.onboarded,
+            enter = slideInVertically(spring(BOUNCY, Spring.StiffnessMediumLow)) { it / 3 } + fadeIn(),
+            exit = slideOutVertically { it / 3 } + fadeOut()
+        ) {
+            BackHandler { vm.settingsOpen = false }
+            SettingsScreen(vm, onClose = { vm.settingsOpen = false })
+        }
+
+        AnimatedVisibility(
             visible = vm.loginOpen,
             enter = slideInVertically(spring(BOUNCY, Spring.StiffnessLow)) { it } + fadeIn(),
             exit = slideOutVertically { it } + fadeOut()
@@ -142,6 +154,7 @@ fun SonoraScreen(vm: PlayerViewModel) {
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        topBar = { TopBar(vm) },
         bottomBar = {
             Column {
                 AnimatedVisibility(
@@ -155,20 +168,20 @@ fun SonoraScreen(vm: PlayerViewModel) {
                     NavigationBarItem(
                         selected = tab == 0,
                         onClick = { tab = 0 },
-                        icon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                        label = { Text("Cerca") }
+                        icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
+                        label = { Text("Home") }
                     )
                     NavigationBarItem(
                         selected = tab == 1,
                         onClick = { tab = 1 },
-                        icon = { Icon(Icons.Rounded.LibraryMusic, contentDescription = null) },
-                        label = { Text("Libreria") }
+                        icon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                        label = { Text("Ricerca") }
                     )
                     NavigationBarItem(
                         selected = tab == 2,
                         onClick = { tab = 2 },
-                        icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
-                        label = { Text("Impostazioni") }
+                        icon = { Icon(Icons.Rounded.LibraryMusic, contentDescription = null) },
+                        label = { Text("Raccolta") }
                     )
                 }
             }
@@ -177,21 +190,67 @@ fun SonoraScreen(vm: PlayerViewModel) {
         AnimatedContent(
             targetState = tab,
             transitionSpec = {
-                (fadeIn(tween(250, delayMillis = 60)) + scaleIn(initialScale = 0.96f)) togetherWith
-                    fadeOut(tween(120))
+                fadeIn(tween(200, delayMillis = 40)) togetherWith fadeOut(tween(100))
             },
             label = "tabs"
         ) { t ->
             when (t) {
-                0 -> SearchContent(vm, Modifier.padding(padding))
-                1 -> LibraryScreen(vm, Modifier.padding(padding))
-                else -> SettingsScreen(vm, Modifier.padding(padding))
+                0 -> HomeScreen(vm, 0.dp, Modifier.padding(padding))
+                1 -> SearchContent(vm, Modifier.padding(padding))
+                else -> LibraryScreen(vm, Modifier.padding(padding))
             }
         }
     }
 
     if (vm.playerOpen && vm.nowPlaying != null) {
         PlayerSheet(vm, onDismiss = { vm.playerOpen = false })
+    }
+
+    vm.menuTrack?.let { track ->
+        TrackMenuSheet(vm, track, onDismiss = { vm.menuTrack = null })
+    }
+}
+
+/** Barra in alto: nome dell'app a sinistra, foto profilo (apre le impostazioni) a destra. */
+@Composable
+private fun TopBar(vm: PlayerViewModel) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            "Sonora",
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
+            modifier = Modifier.weight(1f)
+        )
+        ProfileButton(vm)
+    }
+}
+
+@Composable
+private fun ProfileButton(vm: PlayerViewModel) {
+    val photo = vm.store.accountPhoto
+    val initial = vm.store.userName.trim().firstOrNull()?.uppercase() ?: "S"
+    Surface(
+        onClick = { vm.settingsOpen = true },
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        modifier = Modifier.size(44.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (photo != null) {
+                Artwork(photo, Modifier.fillMaxSize(), CircleShape, px = 128)
+            } else {
+                Text(
+                    initial,
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
     }
 }
 
@@ -213,22 +272,9 @@ private fun AskNotificationPermission() {
 
 @Composable
 private fun SearchContent(vm: PlayerViewModel, modifier: Modifier = Modifier) {
-    var addTrack by remember { mutableStateOf<Track?>(null) }
+    val store = vm.store
 
     Column(modifier.fillMaxSize()) {
-        Text(
-            text = "Sonora",
-            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold),
-            modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp)
-        )
-        if (vm.store.userName.isNotBlank()) {
-            Text(
-                text = "Ciao, ${vm.store.userName}",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp)
-            )
-        }
         SearchField(vm)
 
         when {
@@ -236,27 +282,45 @@ private fun SearchContent(vm: PlayerViewModel, modifier: Modifier = Modifier) {
                 BouncyLoader()
             }
 
-            vm.results.isEmpty() -> Message(
-                vm.error ?: "Cerca un brano o un artista per iniziare"
-            )
+            // Risultati della ricerca in corso.
+            vm.results.isNotEmpty() && vm.query.isNotBlank() -> TrackList(vm, vm.results, fromSearch = true)
 
-            else -> LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
-                itemsIndexed(vm.results, key = { _, t -> t.id }) { index, track ->
-                    TrackRow(
-                        track = track,
-                        selected = vm.nowPlaying?.id == track.id,
-                        liked = vm.store.isLiked(track.id),
-                        onClick = { vm.playFrom(index) },
-                        onLike = { vm.store.toggleLike(track) },
-                        onMore = { addTrack = track },
-                        modifier = Modifier.animateItem()
-                    )
-                }
+            vm.error != null && vm.query.isNotBlank() -> Message(vm.error ?: "")
+
+            // Mai cercato nulla: testo di sempre.
+            !store.hasSearched -> Message("Cerca un brano o un artista per iniziare")
+
+            // Ha già cercato: i brani riprodotti dopo le ricerche.
+            store.searchPlays.isEmpty() -> Message("Avvia un brano dai risultati e lo ritroverai qui")
+
+            else -> Column(Modifier.fillMaxSize()) {
+                Text(
+                    "Riprodotti dopo le tue ricerche",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 4.dp)
+                )
+                TrackList(vm, store.searchPlays.toList(), fromSearch = false)
             }
         }
     }
+}
 
-    addTrack?.let { AddToPlaylistDialog(vm.store, it) { addTrack = null } }
+@Composable
+private fun TrackList(vm: PlayerViewModel, tracks: List<Track>, fromSearch: Boolean) {
+    LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
+        itemsIndexed(tracks, key = { _, t -> t.id }) { index, track ->
+            TrackRow(
+                track = track,
+                selected = vm.nowPlaying?.id == track.id,
+                liked = vm.store.isLiked(track.id),
+                onClick = { vm.play(tracks, index, fromSearch) },
+                onLike = { vm.store.toggleLike(track) },
+                onMore = { vm.menuTrack = track },
+                modifier = Modifier.animateItem()
+            )
+        }
+    }
 }
 
 @Composable
@@ -309,7 +373,7 @@ private fun MiniPlayer(vm: PlayerViewModel, onOpen: () -> Unit) {
                 Modifier.padding(start = 16.dp, top = 12.dp, end = 12.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Artwork(np.artwork, Modifier.size(52.dp), RoundedCornerShape(16.dp))
+                Artwork(np.artwork, Modifier.size(52.dp), RoundedCornerShape(16.dp), px = 192)
                 Spacer(Modifier.size(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -328,7 +392,7 @@ private fun MiniPlayer(vm: PlayerViewModel, onOpen: () -> Unit) {
                 PlayPauseButton(vm, large = false)
             }
             WavyProgress(
-                progress = vm.progress,
+                progress = { vm.progress },
                 playing = vm.wantsPlay,
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)
             )
@@ -336,19 +400,27 @@ private fun MiniPlayer(vm: PlayerViewModel, onOpen: () -> Unit) {
     }
 }
 
-/** Barra di avanzamento a onda: ondeggia mentre suona e si "spiana" in pausa. */
+/**
+ * Barra di avanzamento a onda: ondeggia mentre suona e si "spiana" in pausa.
+ * Per non pesare sui telefoni meno potenti l'animazione gira solo durante la riproduzione
+ * e avanzamento/fase sono letti in fase di disegno (nessuna ricomposizione).
+ */
 @Composable
-private fun WavyProgress(progress: Float, playing: Boolean, modifier: Modifier = Modifier) {
+private fun WavyProgress(progress: () -> Float, playing: Boolean, modifier: Modifier = Modifier) {
     val active = MaterialTheme.colorScheme.primary
     val track = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.18f)
 
-    val transition = rememberInfiniteTransition(label = "wave")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * PI).toFloat(),
-        animationSpec = infiniteRepeatable(animation = tween(1200, easing = LinearEasing)),
-        label = "phase"
-    )
+    val phase = remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(playing) {
+        if (playing) {
+            while (true) {
+                phase.animateTo(
+                    phase.value + (2 * PI).toFloat(),
+                    tween(1400, easing = LinearEasing)
+                )
+            }
+        }
+    }
     val amp by animateFloatAsState(
         targetValue = if (playing) 1f else 0f,
         animationSpec = spring(BOUNCY, Spring.StiffnessVeryLow),
@@ -360,7 +432,8 @@ private fun WavyProgress(progress: Float, playing: Boolean, modifier: Modifier =
         val amplitude = 5.dp.toPx() * amp
         val wavelength = 32.dp.toPx()
         val cy = size.height / 2f
-        val endX = (size.width * progress).coerceIn(0f, size.width)
+        val endX = (size.width * progress()).coerceIn(0f, size.width)
+        val phase = phase.value
 
         drawLine(
             color = track,
@@ -433,13 +506,14 @@ private fun PlayerSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
                     Box(Modifier.fillMaxWidth(0.88f).aspectRatio(1f)) {
                         Artwork(
                             np.artwork,
-                            Modifier
+                            px = 900,
+                            modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer {
                                     scaleX = artScale
                                     scaleY = artScale
                                 },
-                            RoundedCornerShape(artCorner.coerceAtLeast(0.dp))
+                            shape = RoundedCornerShape(artCorner.coerceAtLeast(0.dp))
                         )
                     }
                 }
@@ -476,20 +550,7 @@ private fun PlayerSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
                 }
             }
 
-            var dragging by remember { mutableStateOf<Float?>(null) }
-            Slider(
-                value = dragging ?: vm.progress,
-                onValueChange = { dragging = it },
-                onValueChangeFinished = {
-                    dragging?.let(vm::seekToFraction)
-                    dragging = null
-                }
-            )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                val shown = ((dragging ?: vm.progress) * vm.durationMs).toLong()
-                Text(formatTime(shown), style = MaterialTheme.typography.labelMedium)
-                Text(formatTime(vm.durationMs), style = MaterialTheme.typography.labelMedium)
-            }
+            SeekBar(vm)
 
             Spacer(Modifier.height(16.dp))
             Row(
@@ -509,6 +570,25 @@ private fun PlayerSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
     }
 
     addTrack?.let { AddToPlaylistDialog(vm.store, it) { addTrack = null } }
+}
+
+/** Barra di avanzamento isolata: si aggiorna 4 volte al secondo senza ricomporre tutto il player. */
+@Composable
+private fun SeekBar(vm: PlayerViewModel) {
+    var dragging by remember { mutableStateOf<Float?>(null) }
+    Slider(
+        value = dragging ?: vm.progress,
+        onValueChange = { dragging = it },
+        onValueChangeFinished = {
+            dragging?.let(vm::seekToFraction)
+            dragging = null
+        }
+    )
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        val shown = ((dragging ?: vm.progress) * vm.durationMs).toLong()
+        Text(formatTime(shown), style = MaterialTheme.typography.labelMedium)
+        Text(formatTime(vm.durationMs), style = MaterialTheme.typography.labelMedium)
+    }
 }
 
 /**

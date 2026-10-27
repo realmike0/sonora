@@ -14,8 +14,8 @@ android {
         applicationId = "com.sonora.music"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 21
+        versionName = "0.21-beta"
     }
 
     buildTypes {
@@ -72,6 +72,8 @@ dependencies {
     // Riproduzione in background
     implementation("androidx.media3:media3-exoplayer:1.8.0")
     implementation("androidx.media3:media3-session:1.8.0")
+    implementation("androidx.media3:media3-database:1.8.0")
+    implementation("androidx.media3:media3-datasource:1.8.0")
     implementation("androidx.media3:media3-datasource-okhttp:1.8.0")
 
     // Rete, immagini, estrazione stream

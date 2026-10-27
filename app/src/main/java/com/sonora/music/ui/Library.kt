@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sonora.music.ui
 
 import androidx.activity.compose.BackHandler
@@ -31,7 +33,9 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
@@ -53,6 +57,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.sonora.music.AudioStore
+import com.sonora.music.CACHE_ID
+import com.sonora.music.DOWNLOADS_ID
 import com.sonora.music.LIKED_ID
 import com.sonora.music.PlayerViewModel
 import com.sonora.music.Track
@@ -94,7 +101,7 @@ private fun LibraryHome(vm: PlayerViewModel, onOpen: (String) -> Unit) {
         item {
             Column(Modifier.padding(start = 8.dp, top = 16.dp, bottom = 8.dp)) {
                 Text(
-                    "Libreria",
+                    "Raccolta",
                     style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold)
                 )
                 if (store.userName.isNotBlank()) {
@@ -114,6 +121,30 @@ private fun LibraryHome(vm: PlayerViewModel, onOpen: (String) -> Unit) {
                 cover = null,
                 heart = true,
                 onClick = { onOpen(LIKED_ID) }
+            )
+        }
+
+        item {
+            val downloadedCount = store.played.count { it.id in AudioStore.downloadedIds }
+            PlaylistCard(
+                title = "Scaricati",
+                subtitle = "$downloadedCount brani · disponibili offline",
+                cover = null,
+                heart = false,
+                icon = Icons.Rounded.Download,
+                onClick = { onOpen(DOWNLOADS_ID) }
+            )
+        }
+
+        item {
+            val cachedCount = store.played.count { it.id in AudioStore.cachedIds }
+            PlaylistCard(
+                title = "In cache",
+                subtitle = "$cachedCount brani · salvati automaticamente",
+                cover = null,
+                heart = false,
+                icon = Icons.Rounded.Storage,
+                onClick = { onOpen(CACHE_ID) }
             )
         }
 
@@ -155,7 +186,8 @@ private fun PlaylistCard(
     cover: String?,
     heart: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null
 ) {
     Surface(
         onClick = onClick,
@@ -164,7 +196,21 @@ private fun PlaylistCard(
         modifier = modifier.fillMaxWidth()
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (heart) {
+            if (icon != null) {
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    modifier = Modifier.size(60.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+            } else if (heart) {
                 Box(
                     Modifier
                         .size(60.dp)
@@ -210,16 +256,29 @@ private fun PlaylistCard(
 private fun PlaylistDetail(vm: PlayerViewModel, id: String, onBack: () -> Unit) {
     val store = vm.store
     val isLikedList = id == LIKED_ID
+    val isCache = id == CACHE_ID
+    val isDownloads = id == DOWNLOADS_ID
+    val isSpecial = isLikedList || isCache || isDownloads
     val playlist = store.playlists.firstOrNull { it.id == id }
 
-    if (!isLikedList && playlist == null) {
+    if (!isSpecial && playlist == null) {
         // La playlist è stata eliminata.
         LaunchedEffect(Unit) { onBack() }
         return
     }
 
-    val title = if (isLikedList) "Brani che ti piacciono" else playlist?.name.orEmpty()
-    val tracks: List<Track> = if (isLikedList) store.liked.toList() else playlist?.tracks.orEmpty()
+    val title = when {
+        isLikedList -> "Brani che ti piacciono"
+        isCache -> "In cache"
+        isDownloads -> "Scaricati"
+        else -> playlist?.name.orEmpty()
+    }
+    val tracks: List<Track> = when {
+        isLikedList -> store.liked.toList()
+        isCache -> store.played.filter { it.id in AudioStore.cachedIds }
+        isDownloads -> store.played.filter { it.id in AudioStore.downloadedIds }
+        else -> playlist?.tracks.orEmpty()
+    }
     var addTrack by remember { mutableStateOf<Track?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
 
@@ -238,7 +297,7 @@ private fun PlaylistDetail(vm: PlayerViewModel, id: String, onBack: () -> Unit) 
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            if (!isLikedList) {
+            if (!isSpecial) {
                 IconButton(onClick = { confirmDelete = true }) {
                     Icon(Icons.Rounded.Delete, contentDescription = "Elimina playlist")
                 }
@@ -254,7 +313,14 @@ private fun PlaylistDetail(vm: PlayerViewModel, id: String, onBack: () -> Unit) 
         }
 
         if (tracks.isEmpty()) {
-            Message(if (isLikedList) "Tocca il cuore su un brano per salvarlo qui" else "Questa playlist è vuota")
+            Message(
+                when {
+                    isLikedList -> "Tocca il cuore su un brano per salvarlo qui"
+                    isCache -> "I brani che ascolti vengono salvati qui in automatico"
+                    isDownloads -> "Tieni premuto su un brano e scegli Scarica"
+                    else -> "Questa playlist è vuota"
+                }
+            )
         } else {
             LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
                 itemsIndexed(tracks, key = { _, t -> t.id }) { index, track ->
@@ -264,15 +330,35 @@ private fun PlaylistDetail(vm: PlayerViewModel, id: String, onBack: () -> Unit) 
                         liked = store.isLiked(track.id),
                         onClick = { vm.play(tracks, index) },
                         onLike = { store.toggleLike(track) },
-                        onMore = { addTrack = track },
+                        onMore = { vm.menuTrack = track },
                         modifier = Modifier.animateItem(),
-                        trailing = if (!isLikedList) {
-                            {
-                                IconButton(onClick = { store.removeFromPlaylist(id, track.id) }) {
-                                    Icon(Icons.Rounded.Close, contentDescription = "Rimuovi dalla playlist")
+                        trailing = when {
+                            isCache -> {
+                                {
+                                    IconButton(onClick = { vm.download(track) }) {
+                                        Icon(Icons.Rounded.Download, contentDescription = "Scarica")
+                                    }
                                 }
                             }
-                        } else null
+
+                            isDownloads -> {
+                                {
+                                    IconButton(onClick = { vm.removeOffline(track.id) }) {
+                                        Icon(Icons.Rounded.Delete, contentDescription = "Rimuovi dai download")
+                                    }
+                                }
+                            }
+
+                            !isLikedList -> {
+                                {
+                                    IconButton(onClick = { store.removeFromPlaylist(id, track.id) }) {
+                                        Icon(Icons.Rounded.Close, contentDescription = "Rimuovi dalla playlist")
+                                    }
+                                }
+                            }
+
+                            else -> null
+                        }
                     )
                 }
             }

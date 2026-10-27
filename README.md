@@ -1,17 +1,23 @@
-# Welcome, Sonora!
+# Sonora
 
-**Totally new YouTube Music Client in *Material You from Italy!🇮🇹***
+Client musicale Android (Kotlin, Jetpack Compose, Material 3 Expressive).
+Cerca brani su YouTube Music tramite NewPipeExtractor e li riproduce in background
+con Media3 (notifica, schermata di blocco, cuffie/Bluetooth).
 
-## Functions⚡
-- YouTube Music Library Sync
-- Lyrics offered by LRCLIB
-- Local Account
-**And more features coming soon!** 🤩
+## Compilare
 
-## Supported Languages
-For now only Italian it's supported, but help is welcome.
+1. Apri la cartella in Android Studio (Ladybug o più recente) e lascia finire il sync.
+2. Run su un dispositivo/emulatore (Android 8.0+), oppure da terminale:
+   `./gradlew assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk`
 
-### For more information subscribe to the official [Telegram Channel](https://t.me/sonaraclient)!
+## Struttura
 
-*Report bugs or suggest features in the Issues Tab, thanks*
-*Made in 🇮🇹 by **realmike❤️***
+- `PlaybackService.kt` – servizio in primo piano + MediaSession; risolve l'URL audio al momento del play
+- `MusicRepository.kt` – ricerca e estrazione dello stream (NewPipeExtractor)
+- `PlayerViewModel.kt` – collega la UI al servizio tramite MediaController
+- `ui/` – tema Expressive, ricerca, mini player con barra ondulata, player a schermo intero
+
+## Se la riproduzione smette di funzionare
+
+YouTube cambia spesso. Aggiorna la versione di `NewPipeExtractor` in `app/build.gradle.kts`
+(ultime release: github.com/TeamNewPipe/NewPipeExtractor/releases).

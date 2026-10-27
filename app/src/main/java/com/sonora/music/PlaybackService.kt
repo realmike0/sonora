@@ -9,22 +9,18 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DataSpec
-import androidx.media3.datasource.ResolvingDataSource
-import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
-import java.io.IOException
 
-private const val SCHEME = "ytm"
+const val TRACK_SCHEME = "ytm"
 
 /** URI segnaposto: l'URL reale viene risolto al momento della riproduzione. */
 fun trackUri(videoId: String): Uri =
-    Uri.Builder().scheme(SCHEME).authority("track").appendPath(videoId).build()
+    Uri.Builder().scheme(TRACK_SCHEME).authority("track").appendPath(videoId).build()
 
 /**
  * Servizio in primo piano che tiene viva la riproduzione quando l'app è in background,
@@ -39,25 +35,10 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
 
-        val http = OkHttpDataSource.Factory(Http.client).setUserAgent(USER_AGENT)
-        val resolving = ResolvingDataSource.Factory(http, ResolvingDataSource.Resolver { spec: DataSpec ->
-            if (spec.uri.scheme == SCHEME) {
-                val id = spec.uri.lastPathSegment ?: throw IOException("ID brano mancante")
-                val url = try {
-                    MusicRepository.resolveAudioUrl(id)
-                } catch (e: IOException) {
-                    throw e
-                } catch (e: Exception) {
-                    throw IOException("Impossibile ottenere lo stream: ${e.message}", e)
-                }
-                spec.withUri(Uri.parse(url))
-            } else {
-                spec
-            }
-        })
+        AudioStore.init(this)
 
         val player = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(resolving))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(AudioStore.playbackFactory()))
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -72,6 +53,8 @@ class PlaybackService : MediaSessionService() {
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 retriedId = null
+                // Salva il brano intero in cache mentre lo ascolti.
+                mediaItem?.let { AudioStore.fillCache(it.mediaId) }
             }
 
             override fun onPlayerError(error: PlaybackException) {
