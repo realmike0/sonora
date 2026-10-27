@@ -1,6 +1,9 @@
 package com.sonora.music.ui
 
+import android.os.Build
 import androidx.compose.foundation.background
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -61,7 +64,17 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
         }
     }
 
-    Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    // Schermata sempre scura con i colori dinamici del telefono: testo chiaro e leggibile.
+    val scheme = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) dynamicDarkColorScheme(context) else darkColorScheme()
+    }
+
+    MaterialTheme(colorScheme = scheme) {
+    Surface(
+        color = scheme.background,
+        contentColor = scheme.onBackground,
+        modifier = modifier.fillMaxSize()
+    ) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -124,13 +137,11 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
 
-        Watermark(
-            Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 20.dp, bottom = 12.dp)
-        )
+            // Filigrana: in fondo alla pagina, scorre insieme al resto (non resta sovrapposta).
+            Watermark(Modifier.padding(top = 8.dp, bottom = 8.dp))
+        }
+    }
     }
 }
 
@@ -279,6 +290,24 @@ private fun CacheSection() {
     Text(
         "In cache: ${formatBytes(AudioStore.cacheUsedBytes)} (limite $limitText)",
         style = MaterialTheme.typography.titleMedium
+    )
+    Text(
+        "Brani completi: ${AudioStore.cachedIds.size} · parziali: ${AudioStore.partialCount}",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    AudioStore.lastFillError?.let {
+        Text(
+            "Ultimo errore di salvataggio: $it",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error
+        )
+    }
+    Text(
+        "I file sono nella memoria privata dell'app (non visibili con il gestore file): " +
+            "per vedere i brani apri Raccolta → In cache.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     Text(
         "Scaricati: ${formatBytes(AudioStore.downloadsUsedBytes)}",

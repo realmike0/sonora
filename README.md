@@ -70,6 +70,6 @@ Sonora non è affiliata a YouTube, Google o YouTube Music. L'importazione delle 
 
 <div align="center">
 
-*Made with ❤️ by [realmike0](https://www.github.com/realmike0)*
+*Made with ❤️ by [realmike0](https://www.github.com/realmike0) on GitHub*
 
 </div>

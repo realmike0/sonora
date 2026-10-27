@@ -54,7 +54,16 @@ object AudioStore {
     var downloadsUsedBytes by mutableStateOf(0L)
         private set
 
+    /** Brani presenti in cache solo in parte (non ancora completi, quindi non riproducibili offline). */
+    var partialCount by mutableStateOf(0)
+        private set
+
+    /** Ultimo errore nel completare un brano in cache (per capire perché un brano resta parziale). */
+    var lastFillError by mutableStateOf<String?>(null)
+        private set
+
     private val fillExecutor = Executors.newSingleThreadExecutor()
+    private val stateExecutor = Executors.newSingleThreadExecutor()
     private val downloadExecutor = Executors.newFixedThreadPool(2)
     private val main = Handler(Looper.getMainLooper())
 
@@ -135,10 +144,14 @@ object AudioStore {
     }
 
     fun refresh() {
-        fillExecutor.execute {
+        // Esecutore dedicato: non deve aspettare che finisca un brano in salvataggio.
+        stateExecutor.execute {
             try {
                 val downloaded = downloadCache.keys.filter { isFull(downloadCache, it) }.toSet()
-                val cached = streamCache.keys.filter { isFull(streamCache, it) }.toSet() - downloaded
+                val streamKeys = streamCache.keys.toList()
+                val full = streamKeys.filter { isFull(streamCache, it) }.toSet()
+                val cached = full - downloaded
+                partialCount = streamKeys.count { it !in full }
                 downloadedIds = downloaded
                 cachedIds = cached
                 cacheUsedBytes = streamCache.cacheSpace
@@ -241,8 +254,12 @@ object AudioStore {
                 val writer = CacheWriter(source, specFor(id), null, null)
                 fillWriter = writer
                 writer.cache()
+                lastFillError = null
+            } catch (e: java.io.InterruptedIOException) {
+                // Annullato (hai cambiato brano): nessun errore.
             } catch (e: Exception) {
-                // Annullato o rete assente: si riprova al prossimo ascolto.
+                // Rete assente o rifiuto del server: si riprova al prossimo ascolto.
+                lastFillError = e.message ?: e.javaClass.simpleName
             } finally {
                 refresh()
             }
