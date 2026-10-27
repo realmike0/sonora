@@ -61,7 +61,7 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.09.00"))
     implementation("androidx.compose.ui:ui")
     // Material 3 con le API Expressive. Se il build fallisce per questa riga, vedi README/istruzioni: basta tornare a "androidx.compose.material3:material3" e ripristinare Theme.kt.
-    implementation("androidx.compose.material3:material3:1.5.0-alpha23")
+    implementation("androidx.compose.material3:material3")
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.animation:animation")
