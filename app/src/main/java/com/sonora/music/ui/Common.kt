@@ -252,7 +252,7 @@ fun Reveal(
 
 /** Cuoricino che "pulsa" quando viene attivato. */
 @Composable
-fun LikeButton(liked: Boolean, onClick: () -> Unit) {
+fun LikeButton(liked: Boolean, onClick: () -> Unit, tint: androidx.compose.ui.graphics.Color? = null) {
     val scale = remember { Animatable(1f) }
     var initial by remember { mutableStateOf(true) }
     LaunchedEffect(liked) {
@@ -267,7 +267,7 @@ fun LikeButton(liked: Boolean, onClick: () -> Unit) {
         Icon(
             imageVector = if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
             contentDescription = if (liked) "Rimuovi dai Mi piace" else "Mi piace",
-            tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = tint ?: if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.graphicsLayer {
                 scaleX = scale.value
                 scaleY = scale.value

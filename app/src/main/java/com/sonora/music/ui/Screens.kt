@@ -77,6 +77,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -107,6 +108,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.core.content.ContextCompat
@@ -115,6 +118,9 @@ import com.sonora.music.Track
 import com.sonora.music.toTrack
 import kotlin.math.PI
 import kotlin.math.sin
+
+/** Posizione della copertina nel mini player: da qui parte l'animazione del player a schermo intero. */
+internal var miniCoverRect by mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
 
 // Molla "gommosa" usata da quasi tutte le animazioni.
 private const val BOUNCY = Spring.DampingRatioMediumBouncy
@@ -166,55 +172,74 @@ fun SonoraScreen(vm: PlayerViewModel) {
     var tab by rememberSaveable { mutableStateOf(0) }
     AskNotificationPermission()
 
+    // Altezza di mini player + barra fluttuante: serve alle liste per non finirci sotto.
+    var overlayPx by remember { mutableIntStateOf(0) }
+    val bottomPad = with(LocalDensity.current) { overlayPx.toDp() }
+
     Box(Modifier.fillMaxSize()) {
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = { TopBar(vm) }
-    ) { padding ->
-        // Altezza di mini player + barra fluttuante: serve alle liste per non finirci sotto.
-        var overlayPx by remember { mutableIntStateOf(0) }
-        val bottomPad = with(LocalDensity.current) { overlayPx.toDp() }
-
-        Box(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
-            AnimatedContent(
-                targetState = tab,
-                transitionSpec = {
-                    fadeIn(tween(200, delayMillis = 40)) togetherWith fadeOut(tween(100))
-                },
-                label = "tabs"
-            ) { t ->
-                when (t) {
-                    0 -> HomeScreen(vm, bottomPad)
-                    1 -> SearchContent(vm, bottomPad)
-                    else -> LibraryScreen(vm, bottomPad)
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = { TopBar(vm) }
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
+                AnimatedContent(
+                    targetState = tab,
+                    transitionSpec = {
+                        fadeIn(tween(200, delayMillis = 40)) togetherWith fadeOut(tween(100))
+                    },
+                    label = "tabs"
+                ) { t ->
+                    when (t) {
+                        0 -> HomeScreen(vm, bottomPad)
+                        1 -> SearchContent(vm, bottomPad)
+                        else -> LibraryScreen(vm, bottomPad)
+                    }
                 }
-            }
-
-            val bg = MaterialTheme.colorScheme.background
-            Column(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .onSizeChanged { overlayPx = it.height }
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, bg.copy(alpha = 0.92f))))
-                    .navigationBarsPadding()
-                    .padding(top = 12.dp, bottom = 12.dp)
-            ) {
-                AnimatedVisibility(
-                    visible = vm.nowPlaying != null,
-                    enter = slideInVertically(spring(BOUNCY, Spring.StiffnessLow)) { it } + fadeIn(),
-                    exit = slideOutVertically { it } + fadeOut()
-                ) {
-                    MiniPlayer(vm, onOpen = { vm.playerOpen = true })
-                }
-                FloatingNavBar(selected = tab, onSelect = { tab = it })
             }
         }
-    }
 
-    if (vm.playerOpen && vm.nowPlaying != null) {
-        FullPlayer(vm, onDismiss = { vm.playerOpen = false })
-    }
+        // Pagina dell'artista: copre la schermata, ma sotto a mini player e barra.
+        AnimatedVisibility(
+            visible = vm.artistOpen != null,
+            enter = fadeIn(tween(250)) + scaleIn(initialScale = 0.94f, animationSpec = spring(BOUNCY, Spring.StiffnessMediumLow)),
+            exit = fadeOut(tween(150))
+        ) {
+            val name = vm.artistOpen
+            if (name != null) {
+                ArtistScreen(vm, name, bottomPad, onClose = { vm.artistOpen = null })
+            }
+        }
+
+        val bg = MaterialTheme.colorScheme.background
+        Column(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .onSizeChanged { overlayPx = it.height }
+                .background(Brush.verticalGradient(listOf(Color.Transparent, bg.copy(alpha = 0.92f))))
+                .navigationBarsPadding()
+                .padding(top = 12.dp, bottom = 12.dp)
+        ) {
+            AnimatedVisibility(
+                visible = vm.nowPlaying != null,
+                enter = slideInVertically(spring(BOUNCY, Spring.StiffnessLow)) { it } + fadeIn(),
+                exit = slideOutVertically { it } + fadeOut()
+            ) {
+                MiniPlayer(vm, onOpen = { vm.playerOpen = true })
+            }
+            FloatingNavBar(selected = tab, onSelect = {
+                tab = it
+                vm.artistOpen = null
+            })
+        }
+
+        if (vm.playerOpen && vm.nowPlaying != null) {
+            FullPlayer(
+                vm,
+                onDismiss = { vm.playerOpen = false },
+                onArtist = { vm.artistOpen = it }
+            )
+        }
     }
 
     vm.menuTrack?.let { track ->
@@ -387,7 +412,14 @@ private fun MiniPlayer(vm: PlayerViewModel, onOpen: () -> Unit) {
                 Modifier.padding(start = 16.dp, top = 12.dp, end = 12.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Artwork(np.artwork, Modifier.size(52.dp), RoundedCornerShape(16.dp), px = 192)
+                Artwork(
+                    np.artwork,
+                    Modifier
+                        .size(52.dp)
+                        .onGloballyPositioned { miniCoverRect = it.boundsInRoot() },
+                    RoundedCornerShape(16.dp),
+                    px = 192
+                )
                 Spacer(Modifier.size(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -477,7 +509,7 @@ private fun WavyProgress(progress: () -> Float, playing: Boolean, modifier: Modi
 
 /** Barra di avanzamento isolata: si aggiorna 4 volte al secondo senza ricomporre tutto il player. */
 @Composable
-internal fun SeekBar(vm: PlayerViewModel) {
+internal fun SeekBar(vm: PlayerViewModel, tint: Color? = null) {
     var dragging by remember { mutableStateOf<Float?>(null) }
     Slider(
         value = dragging ?: vm.progress,
@@ -485,12 +517,18 @@ internal fun SeekBar(vm: PlayerViewModel) {
         onValueChangeFinished = {
             dragging?.let(vm::seekToFraction)
             dragging = null
-        }
+        },
+        colors = if (tint == null) SliderDefaults.colors() else SliderDefaults.colors(
+            thumbColor = tint,
+            activeTrackColor = tint,
+            inactiveTrackColor = tint.copy(alpha = 0.28f)
+        )
     )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         val shown = ((dragging ?: vm.progress) * vm.durationMs).toLong()
-        Text(formatTime(shown), style = MaterialTheme.typography.labelMedium)
-        Text(formatTime(vm.durationMs), style = MaterialTheme.typography.labelMedium)
+        val c = tint?.copy(alpha = 0.75f) ?: Color.Unspecified
+        Text(formatTime(shown), style = MaterialTheme.typography.labelMedium, color = c)
+        Text(formatTime(vm.durationMs), style = MaterialTheme.typography.labelMedium, color = c)
     }
 }
 

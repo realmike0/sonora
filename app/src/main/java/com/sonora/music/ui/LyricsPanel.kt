@@ -40,7 +40,8 @@ fun LyricsPanel(vm: PlayerViewModel, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(32.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+        color = androidx.compose.ui.graphics.Color.Transparent,
+        contentColor = androidx.compose.ui.graphics.Color.White
     ) {
         when {
             vm.lyricsLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -54,7 +55,7 @@ fun LyricsPanel(vm: PlayerViewModel, modifier: Modifier = Modifier) {
                 Text(
                     "Testo non disponibile per questo brano",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.75f),
                     textAlign = TextAlign.Center
                 )
             }

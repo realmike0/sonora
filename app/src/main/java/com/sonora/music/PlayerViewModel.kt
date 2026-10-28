@@ -43,6 +43,8 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     var playerOpen by mutableStateOf(false)
     var loginOpen by mutableStateOf(false)
     var settingsOpen by mutableStateOf(false)
+    /** Artista aperto nella sua pagina (null = nessuna). */
+    var artistOpen by mutableStateOf<String?>(null)
 
     /** Brano di cui è aperto il menu (pressione prolungata). */
     var menuTrack by mutableStateOf<Track?>(null)

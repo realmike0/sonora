@@ -111,7 +111,7 @@ object MusicRepository {
         streamCache.remove(videoId)
     }
 
-    private fun StreamInfoItem.toTrack(): Track? {
+    internal fun StreamInfoItem.toTrack(): Track? {
         val id = Uri.parse(url).getQueryParameter("v") ?: return null
         return Track(
             id = id,
