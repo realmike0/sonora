@@ -166,6 +166,7 @@ fun SonoraScreen(vm: PlayerViewModel) {
     var tab by rememberSaveable { mutableStateOf(0) }
     AskNotificationPermission()
 
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = { TopBar(vm) }
@@ -212,7 +213,8 @@ fun SonoraScreen(vm: PlayerViewModel) {
     }
 
     if (vm.playerOpen && vm.nowPlaying != null) {
-        PlayerSheet(vm, onDismiss = { vm.playerOpen = false })
+        FullPlayer(vm, onDismiss = { vm.playerOpen = false })
+    }
     }
 
     vm.menuTrack?.let { track ->
@@ -473,120 +475,9 @@ private fun WavyProgress(progress: () -> Float, playing: Boolean, modifier: Modi
     }
 }
 
-@Composable
-private fun PlayerSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
-    val np = vm.nowPlaying ?: return
-    val playing = vm.wantsPlay
-    var showLyrics by remember { mutableStateOf(false) }
-    var addTrack by remember { mutableStateOf<Track?>(null) }
-
-    // La copertina "respira": si rimpicciolisce e si arrotonda in pausa.
-    val artScale by animateFloatAsState(
-        targetValue = if (playing) 1f else 0.86f,
-        animationSpec = spring(BOUNCY, Spring.StiffnessLow),
-        label = "artScale"
-    )
-    val artCorner by animateDpAsState(
-        targetValue = if (playing) 40.dp else 96.dp,
-        animationSpec = spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow),
-        label = "artCorner"
-    )
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
-                .padding(horizontal = 28.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            AnimatedContent(
-                targetState = showLyrics,
-                transitionSpec = {
-                    (fadeIn(tween(300)) + scaleIn(initialScale = 0.9f)) togetherWith
-                        (fadeOut(tween(150)) + scaleOut(targetScale = 0.9f))
-                },
-                label = "artOrLyrics"
-            ) { lyricsMode ->
-                if (lyricsMode) {
-                    LyricsPanel(vm, Modifier.fillMaxWidth(0.88f).aspectRatio(1f))
-                } else {
-                    Box(Modifier.fillMaxWidth(0.88f).aspectRatio(1f)) {
-                        Artwork(
-                            np.artwork,
-                            px = 900,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    scaleX = artScale
-                                    scaleY = artScale
-                                },
-                            shape = RoundedCornerShape(artCorner.coerceAtLeast(0.dp))
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(20.dp))
-            Text(
-                np.title,
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                np.artist,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                LikeButton(liked = vm.store.isLiked(np.id), onClick = { vm.store.toggleLike(np.toTrack()) })
-                FilterChip(
-                    selected = showLyrics,
-                    onClick = { showLyrics = !showLyrics },
-                    label = { Text("Testi") }
-                )
-                IconButton(onClick = { addTrack = np.toTrack() }) {
-                    Icon(Icons.Rounded.Add, contentDescription = "Aggiungi a playlist")
-                }
-            }
-
-            SeekBar(vm)
-
-            Spacer(Modifier.height(16.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                BouncyTonalButton(onClick = vm::previous, modifier = Modifier.size(64.dp)) {
-                    Icon(Icons.Rounded.SkipPrevious, "Precedente", Modifier.size(32.dp))
-                }
-                PlayPauseButton(vm, large = true)
-                BouncyTonalButton(onClick = vm::next, modifier = Modifier.size(64.dp)) {
-                    Icon(Icons.Rounded.SkipNext, "Successivo", Modifier.size(32.dp))
-                }
-            }
-            Spacer(Modifier.height(24.dp))
-        }
-    }
-
-    addTrack?.let { AddToPlaylistDialog(vm.store, it) { addTrack = null } }
-}
-
 /** Barra di avanzamento isolata: si aggiorna 4 volte al secondo senza ricomporre tutto il player. */
 @Composable
-private fun SeekBar(vm: PlayerViewModel) {
+internal fun SeekBar(vm: PlayerViewModel) {
     var dragging by remember { mutableStateOf<Float?>(null) }
     Slider(
         value = dragging ?: vm.progress,
@@ -608,7 +499,7 @@ private fun SeekBar(vm: PlayerViewModel) {
  * si schiaccia quando lo premi e l'icona "scoppia" dentro e fuori.
  */
 @Composable
-private fun PlayPauseButton(vm: PlayerViewModel, large: Boolean) {
+internal fun PlayPauseButton(vm: PlayerViewModel, large: Boolean) {
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -651,7 +542,7 @@ private fun PlayPauseButton(vm: PlayerViewModel, large: Boolean) {
 
 /** Pulsante tonale che rimbalza quando lo premi. */
 @Composable
-private fun BouncyTonalButton(
+internal fun BouncyTonalButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit

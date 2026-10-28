@@ -60,7 +60,7 @@ fun SplashOverlay(visible: Boolean) {
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Image(
-                    painter = painterResource(R.drawable.ic_launcher_foreground),
+                    painter = painterResource(R.drawable.ic_splash_logo),
                     contentDescription = null,
                     modifier = Modifier
                         .size(168.dp)
