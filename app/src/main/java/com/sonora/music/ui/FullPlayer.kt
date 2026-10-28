@@ -366,7 +366,7 @@ fun FullPlayer(vm: PlayerViewModel, onDismiss: () -> Unit, onArtist: (String) ->
 
 /** Play/pausa grande: cerchio bianco che diventa quadrato smussato quando suona, con icona che "scoppia". */
 @Composable
-private fun PlayButton(vm: PlayerViewModel) {
+internal fun PlayButton(vm: PlayerViewModel, size: Dp = 84.dp) {
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -385,7 +385,7 @@ private fun PlayButton(vm: PlayerViewModel) {
         shape = RoundedCornerShape(percent = corner.coerceIn(0, 50)),
         colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color.Black),
         modifier = Modifier
-            .size(84.dp)
+            .size(size)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -399,7 +399,7 @@ private fun PlayButton(vm: PlayerViewModel) {
             Icon(
                 if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                 contentDescription = if (playing) "Pausa" else "Riproduci",
-                modifier = Modifier.size(44.dp)
+                modifier = Modifier.size(size * 0.52f)
             )
         }
     }

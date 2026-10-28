@@ -14,15 +14,28 @@ android {
         applicationId = "com.sonora.music"
         minSdk = 26
         targetSdk = 36
-        versionCode = 31
-        versionName = "0.31-beta"
+        versionCode = 40
+        versionName = "0.40-beta"
+    }
+
+    // Chiave di firma FISSA (nel repo): ogni build ha la stessa firma, quindi gli aggiornamenti
+    // si installano sopra la versione precedente senza "firma non corrispondente".
+    signingConfigs {
+        create("sonora") {
+            storeFile = file("sonora.jks")
+            storePassword = "sonora-beta"
+            keyAlias = "sonora"
+            keyPassword = "sonora-beta"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("sonora")
+        }
         release {
             isMinifyEnabled = false
-            // Firma con la chiave di debug così la release si installa subito.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("sonora")
         }
     }
 

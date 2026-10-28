@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -152,6 +153,11 @@ fun SonoraRoot(vm: PlayerViewModel) {
             SettingsScreen(vm, onClose = { vm.settingsOpen = false })
         }
 
+        // Telefono in orizzontale: schermata stile AOD (luminosità ridotta, notifiche, brano).
+        if (vm.store.onboarded && !isTabletDevice() && isLandscape()) {
+            AodScreen(vm)
+        }
+
         AnimatedVisibility(
             visible = vm.loginOpen,
             enter = slideInVertically(spring(BOUNCY, Spring.StiffnessLow)) { it } + fadeIn(),
@@ -176,7 +182,11 @@ fun SonoraScreen(vm: PlayerViewModel) {
     var overlayPx by remember { mutableIntStateOf(0) }
     val bottomPad = with(LocalDensity.current) { overlayPx.toDp() }
 
+    // Tablet in orizzontale: a destra il pannello del brano, a sinistra l'app.
+    val wide = isTabletDevice() && isLandscape()
+
     Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxHeight().fillMaxWidth(if (wide) 0.64f else 1f)) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = { TopBar(vm) }
@@ -221,7 +231,7 @@ fun SonoraScreen(vm: PlayerViewModel) {
                 .padding(top = 12.dp, bottom = 12.dp)
         ) {
             AnimatedVisibility(
-                visible = vm.nowPlaying != null,
+                visible = vm.nowPlaying != null && !wide,
                 enter = slideInVertically(spring(BOUNCY, Spring.StiffnessLow)) { it } + fadeIn(),
                 exit = slideOutVertically { it } + fadeOut()
             ) {
@@ -233,7 +243,15 @@ fun SonoraScreen(vm: PlayerViewModel) {
             })
         }
 
-        if (vm.playerOpen && vm.nowPlaying != null) {
+        }
+
+        if (wide) {
+            NowPlayingPane(vm, Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.36f))
+        }
+
+        BannerHost(vm, Modifier.align(Alignment.TopCenter).fillMaxWidth(if (wide) 0.64f else 1f))
+
+        if (vm.playerOpen && vm.nowPlaying != null && !wide) {
             FullPlayer(
                 vm,
                 onDismiss = { vm.playerOpen = false },

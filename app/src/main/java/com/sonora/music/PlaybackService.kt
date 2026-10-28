@@ -3,6 +3,8 @@ package com.sonora.music
 import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -26,11 +28,16 @@ fun trackUri(videoId: String): Uri =
  * Servizio in primo piano che tiene viva la riproduzione quando l'app è in background,
  * con notifica multimediale e controlli nella schermata di blocco.
  */
+private const val FADE_OUT_MS = 4000L
+private const val FADE_IN_MS = 2500L
+
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
 
     private var session: MediaSession? = null
     private var retriedId: String? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var fadeTick: Runnable? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -71,6 +78,35 @@ class PlaybackService : MediaSessionService() {
             }
         })
 
+        // Mixaggio fluido: il brano che finisce sfuma in uscita e il successivo sale in entrata.
+        val prefs = getSharedPreferences("sonora", MODE_PRIVATE)
+        val tick = object : Runnable {
+            override fun run() {
+                try {
+                    if (prefs.getBoolean("mix_fade", true) && player.playWhenReady) {
+                        val dur = player.duration
+                        val pos = player.currentPosition
+                        var v = 1f
+                        if (dur != C.TIME_UNSET && dur > 30_000L) {
+                            if (player.hasNextMediaItem()) {
+                                val rem = dur - pos
+                                if (rem < FADE_OUT_MS) v = minOf(v, smooth(rem.toFloat() / FADE_OUT_MS))
+                            }
+                            if (pos < FADE_IN_MS) v = minOf(v, smooth(pos.toFloat() / FADE_IN_MS))
+                        }
+                        player.volume = v
+                    } else if (player.volume != 1f) {
+                        player.volume = 1f
+                    }
+                } catch (e: Exception) {
+                    // best-effort
+                }
+                handler.postDelayed(this, 120)
+            }
+        }
+        fadeTick = tick
+        handler.post(tick)
+
         // Tocco sulla copertina/notifica: apre l'app sulla schermata principale (mai sul player).
         val openApp = PendingIntent.getActivity(
             this,
@@ -108,7 +144,13 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    private fun smooth(x: Float): Float {
+        val t = x.coerceIn(0f, 1f)
+        return t * t * (3f - 2f * t)
+    }
+
     override fun onDestroy() {
+        fadeTick?.let { handler.removeCallbacks(it) }
         session?.run {
             player.release()
             release()

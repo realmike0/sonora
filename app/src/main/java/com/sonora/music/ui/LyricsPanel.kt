@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -88,7 +89,7 @@ private fun LyricsList(vm: PlayerViewModel, lyrics: Lyrics) {
             LyricLineItem(
                 text = line.text,
                 active = !lyrics.synced || index == active,
-                past = lyrics.synced && index < active,
+                distance = if (lyrics.synced) kotlin.math.abs(index - active) else 0,
                 onClick = if (lyrics.synced) ({ vm.seekToMs(line.timeMs) }) else null
             )
         }
@@ -96,9 +97,9 @@ private fun LyricsList(vm: PlayerViewModel, lyrics: Lyrics) {
 }
 
 @Composable
-private fun LyricLineItem(text: String, active: Boolean, past: Boolean, onClick: (() -> Unit)?) {
+private fun LyricLineItem(text: String, active: Boolean, distance: Int, onClick: (() -> Unit)?) {
     val lineAlpha by animateFloatAsState(
-        targetValue = if (active) 1f else if (past) 0.35f else 0.55f,
+        targetValue = if (active) 1f else (0.5f - 0.06f * distance).coerceAtLeast(0.2f),
         animationSpec = tween(300),
         label = "lineAlpha"
     )
@@ -119,6 +120,8 @@ private fun LyricLineItem(text: String, active: Boolean, past: Boolean, onClick:
                 scaleY = lineScale
                 transformOrigin = TransformOrigin(0f, 0.5f)
             }
+            // Solo la riga attuale è nitida: sopra e sotto il testo si sfoca sempre di più.
+            .then(if (!active && distance > 0) Modifier.blur((distance * 1.6f).coerceAtMost(7f).dp) else Modifier)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     )
 }

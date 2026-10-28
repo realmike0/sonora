@@ -107,6 +107,18 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
                 LyricsSourcePicker(store)
             }
 
+            SettingsCard("Riproduzione") {
+                MixSwitch()
+            }
+
+            SettingsCard("Aggiornamenti") {
+                UpdateSection(vm, version)
+            }
+
+            SettingsCard("Modalità orizzontale (telefono)") {
+                NotificationAccessSection()
+            }
+
             SettingsCard("Account Google") {
                 GoogleSection(vm)
             }
@@ -161,6 +173,86 @@ private fun SettingsCard(title: String, content: @Composable ColumnScope.() -> U
             )
             content()
         }
+    }
+}
+
+@Composable
+private fun MixSwitch() {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("sonora", android.content.Context.MODE_PRIVATE) }
+    var on by remember { mutableStateOf(prefs.getBoolean("mix_fade", true)) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Mixaggio fluido", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Il brano finisce con una dissolvenza e il successivo entra in sfumatura.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        androidx.compose.material3.Switch(
+            checked = on,
+            onCheckedChange = {
+                on = it
+                prefs.edit().putBoolean("mix_fade", it).apply()
+            }
+        )
+    }
+}
+
+@Composable
+private fun UpdateSection(vm: PlayerViewModel, version: String) {
+    Text("Versione installata: $version", style = MaterialTheme.typography.bodyMedium)
+    val rel = vm.update
+    if (rel != null) {
+        Text(
+            "Disponibile: ${rel.tag.removePrefix("v")}",
+            style = MaterialTheme.typography.titleMedium
+        )
+        val progress = vm.updateProgress
+        if (progress != null) {
+            androidx.compose.material3.LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+        }
+        Button(onClick = { vm.downloadUpdate() }, enabled = progress == null) {
+            Text(if (progress == null) "Scarica e installa" else "Scarico… ${(progress * 100).toInt()}%")
+        }
+    }
+    vm.updateMessage?.let {
+        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    OutlinedButton(onClick = { vm.checkUpdate(manual = true) }, enabled = !vm.checkingUpdate) {
+        Text(if (vm.checkingUpdate) "Controllo…" else "Controlla aggiornamenti")
+    }
+    Text(
+        "Sonora controlla da solo le nuove release su GitHub quando apri l'app.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+private fun NotificationAccessSection() {
+    val context = LocalContext.current
+    var access by remember { mutableStateOf(com.sonora.music.NotifHub.hasAccess(context)) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) {
+            access = com.sonora.music.NotifHub.hasAccess(context)
+            kotlinx.coroutines.delay(2_000)
+        }
+    }
+    Text(
+        "Ruotando il telefono in orizzontale Sonora mostra data, ora, notifiche e il brano, con luminosità ridotta.",
+        style = MaterialTheme.typography.bodyMedium
+    )
+    if (access) {
+        Text("Accesso alle notifiche attivo", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+    } else {
+        Button(onClick = {
+            context.startActivity(
+                android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }) { Text("Consenti accesso alle notifiche") }
     }
 }
 

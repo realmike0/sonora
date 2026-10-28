@@ -100,6 +100,21 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     var syncError by mutableStateOf<String?>(null)
         private set
 
+    // --- Aggiornamenti da GitHub ---
+    var update by mutableStateOf<Updater.Release?>(null)
+        private set
+    var updateDismissed by mutableStateOf(false)
+    var updateProgress by mutableStateOf<Float?>(null)
+        private set
+    var updateMessage by mutableStateOf<String?>(null)
+        private set
+    var checkingUpdate by mutableStateOf(false)
+        private set
+
+    // --- Cuffie ---
+    var headset by mutableStateOf<String?>(null)
+    var headsetDismissed by mutableStateOf(false)
+
     private var controller: MediaController? = null
     private var searchJob: Job? = null
 
@@ -121,6 +136,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         home = HomeRepository.loadCached(app.filesDir)
         loadHome()
         refreshAccount()
+        checkUpdate(manual = false)
 
         // Aggiorna la posizione mentre si ascolta (serve anche ai testi sincronizzati).
         viewModelScope.launch {
@@ -129,6 +145,71 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 controller?.let { if (it.isPlaying) positionMs = it.currentPosition }
             }
         }
+    }
+
+    /** Cerca una release più nuova su GitHub (in automatico al massimo ogni 3 ore). */
+    fun checkUpdate(manual: Boolean) {
+        if (checkingUpdate) return
+        val context = getApplication<Application>()
+        val prefs = context.getSharedPreferences("sonora", android.content.Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        if (!manual && now - prefs.getLong("upd_last", 0L) < 3 * 60 * 60 * 1000L) return
+        checkingUpdate = true
+        updateMessage = null
+        viewModelScope.launch {
+            try {
+                val rel = Updater.latest()
+                prefs.edit().putLong("upd_last", now).apply()
+                if (rel != null && Updater.isNewer(rel.tag, Updater.currentVersion(context))) {
+                    update = rel
+                    updateDismissed = false
+                } else {
+                    update = null
+                    if (manual) updateMessage = "Hai già l'ultima versione"
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (manual) updateMessage = "Controllo non riuscito: ${e.message ?: e.javaClass.simpleName}"
+            } finally {
+                checkingUpdate = false
+            }
+        }
+    }
+
+    fun downloadUpdate() {
+        val rel = update ?: return
+        if (updateProgress != null) return
+        val context = getApplication<Application>()
+        updateProgress = 0f
+        updateMessage = null
+        viewModelScope.launch {
+            try {
+                val file = Updater.download(context, rel) { updateProgress = it }
+                updateProgress = null
+                if (!Updater.install(context, file)) {
+                    updateMessage = "Consenti a Sonora di installare app, poi tocca di nuovo Aggiorna"
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                updateProgress = null
+                updateMessage = "Download non riuscito: ${e.message ?: e.javaClass.simpleName}"
+            }
+        }
+    }
+
+    /** "Inizia ad ascoltare": riproduzione casuale dei brani preferiti. */
+    fun startFavorites() {
+        val favorites = store.liked.toList().shuffled()
+        val tracks = favorites.ifEmpty { home?.picks.orEmpty().shuffled() }
+        if (tracks.isNotEmpty()) play(tracks, 0)
+    }
+
+    fun seekBy(deltaMs: Long) {
+        val c = controller ?: return
+        val target = (c.currentPosition + deltaMs).coerceAtLeast(0L)
+        c.seekTo(if (durationMs > 0) target.coerceAtMost(durationMs) else target)
     }
 
     private fun sync(p: Player) {

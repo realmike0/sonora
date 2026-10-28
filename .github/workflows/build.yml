@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,7 +18,24 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x gradlew && ./gradlew assembleDebug --stacktrace
+
+      - name: Nome versione
+        id: ver
+        run: |
+          V=$(grep -m1 'versionName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
+          echo "v=$V" >> "$GITHUB_OUTPUT"
+          cp app/build/outputs/apk/debug/app-debug.apk "Sonora-v$V.apk"
+
       - uses: actions/upload-artifact@v4
         with:
           name: Sonora-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: Sonora-v${{ steps.ver.outputs.v }}.apk
+
+      # Pubblica (o aggiorna) la release: l'app la controlla da sola per gli aggiornamenti.
+      - uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: v${{ steps.ver.outputs.v }}
+          name: Sonora ${{ steps.ver.outputs.v }}
+          prerelease: true
+          files: Sonora-v${{ steps.ver.outputs.v }}.apk

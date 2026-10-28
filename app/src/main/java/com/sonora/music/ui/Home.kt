@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -118,7 +119,7 @@ fun HomeScreen(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit.Dp, modi
 @Composable
 private fun PicksGrid(vm: PlayerViewModel, picks: List<Track>) {
     Column(
-        Modifier.padding(horizontal = 16.dp),
+        Modifier.widthIn(max = 560.dp).padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         for (row in 0 until 3) {
