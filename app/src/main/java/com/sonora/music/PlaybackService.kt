@@ -134,6 +134,27 @@ class PlaybackService : MediaSessionService() {
             .build()
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == Headsets.ACTION_START_FAVORITES) startFavorites()
+        return super.onStartCommand(intent, flags, startId)
+    }
+
+    /** "Inizia ad ascoltare" dalla notifica: preferiti in ordine casuale, senza aprire l'app. */
+    private fun startFavorites() {
+        androidx.core.app.NotificationManagerCompat.from(this).cancel(Headsets.ID_HEADSET)
+        val player = session?.player ?: return
+        val liked = Store(this).liked.toList()
+        val tracks = liked.ifEmpty { HomeRepository.loadCached(filesDir)?.picks.orEmpty() }.shuffled()
+        if (tracks.isEmpty()) return
+        player.setMediaItems(
+            tracks.map { it.toMediaItem().buildUpon().setUri(trackUri(it.id)).build() },
+            0,
+            0L
+        )
+        player.prepare()
+        player.play()
+    }
+
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
 
     override fun onTaskRemoved(rootIntent: Intent?) {

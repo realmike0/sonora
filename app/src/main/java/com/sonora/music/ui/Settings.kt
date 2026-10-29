@@ -111,6 +111,10 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
                 MixSwitch()
             }
 
+            SettingsCard("Sempre attiva") {
+                KeepAliveSection()
+            }
+
             SettingsCard("Aggiornamenti") {
                 UpdateSection(vm, version)
             }
@@ -198,6 +202,40 @@ private fun MixSwitch() {
             }
         )
     }
+}
+
+@Composable
+private fun KeepAliveSection() {
+    val context = LocalContext.current
+    var on by remember { mutableStateOf(com.sonora.music.Headsets.keepAliveEnabled(context)) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Riconosci cuffie e speaker", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Anche ad app chiusa: quando colleghi cuffie, auricolari, speaker o auto arriva una notifica blu con \"Inizia ad ascoltare\".",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        androidx.compose.material3.Switch(
+            checked = on,
+            onCheckedChange = {
+                on = it
+                com.sonora.music.Headsets.setKeepAlive(context, it)
+            }
+        )
+    }
+    OutlinedButton(onClick = {
+        context.startActivity(
+            android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }) { Text("Non limitare la batteria") }
+    Text(
+        "Alcuni telefoni chiudono le app in background: consenti Sonora senza limiti per non perdere il rilevamento.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
 
 @Composable

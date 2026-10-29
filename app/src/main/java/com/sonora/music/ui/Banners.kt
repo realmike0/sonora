@@ -45,20 +45,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.sonora.music.Headsets
 import com.sonora.music.PlayerViewModel
 import com.sonora.music.Updater
 
 private val BANNER_SPRING = spring<androidx.compose.ui.unit.IntOffset>(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow)
 
-/** Avvisi a tendina in alto: aggiornamento disponibile e cuffie collegate. */
+/** Avviso a tendina in alto: aggiornamento disponibile. (Cuffie e speaker hanno la loro schermata: DeviceSheet.) */
 @Composable
 fun BannerHost(vm: PlayerViewModel, modifier: Modifier = Modifier) {
-    HeadsetWatcher(vm)
-
     val update = vm.update
     val showUpdate = update != null && !vm.updateDismissed
-    val headset = vm.headset
-    val showHeadset = headset != null && !vm.headsetDismissed && !vm.wantsPlay && !showUpdate
 
     Column(
         modifier
@@ -71,13 +68,6 @@ fun BannerHost(vm: PlayerViewModel, modifier: Modifier = Modifier) {
             exit = slideOutVertically { -it } + fadeOut()
         ) {
             if (update != null) UpdateCard(vm, update)
-        }
-        AnimatedVisibility(
-            visible = showHeadset,
-            enter = slideInVertically(BANNER_SPRING) { -it } + fadeIn(),
-            exit = slideOutVertically { -it } + fadeOut()
-        ) {
-            HeadsetCard(vm, headset ?: "")
         }
     }
 }
@@ -130,41 +120,6 @@ private fun UpdateCard(vm: PlayerViewModel, rel: Updater.Release) {
 }
 
 @Composable
-private fun HeadsetCard(vm: PlayerViewModel, name: String) {
-    BannerSurface {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconBadge { Icon(Icons.Rounded.Headphones, contentDescription = null, modifier = Modifier.size(28.dp)) }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Cuffie connesse",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                    )
-                    Text(
-                        name.ifBlank { "Dispositivo audio" },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                IconButton(onClick = { vm.headsetDismissed = true }) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Chiudi")
-                }
-            }
-            Button(
-                onClick = {
-                    vm.headsetDismissed = true
-                    vm.startFavorites()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Inizia ad ascoltare") }
-        }
-    }
-}
-
-@Composable
 private fun IconBadge(content: @Composable () -> Unit) {
     Box(
         Modifier
@@ -178,38 +133,23 @@ private fun IconBadge(content: @Composable () -> Unit) {
     }
 }
 
-private fun isHeadset(d: AudioDeviceInfo): Boolean {
-    if (!d.isSink) return false
-    return when (d.type) {
-        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-        AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
-        AudioDeviceInfo.TYPE_WIRED_HEADSET,
-        AudioDeviceInfo.TYPE_USB_HEADSET -> true
-        else -> Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && d.type == AudioDeviceInfo.TYPE_BLE_HEADSET
-    }
-}
-
-private fun scanHeadset(am: AudioManager): String? =
-    am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-        .firstOrNull { isHeadset(it) }
-        ?.let { it.productName?.toString().orEmpty().ifBlank { "Cuffie" } }
-
-/** Tiene aggiornato vm.headset: cuffie già collegate all'apertura o collegate dopo. */
+/** Tiene aggiornato vm.headset: dispositivo audio già collegato all'apertura o collegato mentre l'app è aperta. */
 @Composable
-private fun HeadsetWatcher(vm: PlayerViewModel) {
+fun HeadsetWatcher(vm: PlayerViewModel) {
     val context = LocalContext.current
     DisposableEffect(Unit) {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        vm.headset = scanHeadset(am)
+        vm.headset = Headsets.scan(context, am)
         val callback = object : AudioDeviceCallback() {
             override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
-                val now = scanHeadset(am)
-                if (now != null && now != vm.headset) vm.headsetDismissed = false
-                vm.headset = now
+                val dev = addedDevices.firstOrNull { Headsets.isHeadsetDevice(it) } ?: return
+                val info = Headsets.classify(context, dev)
+                if (info != vm.headset) vm.headsetDismissed = false
+                vm.headset = info
             }
 
             override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
-                vm.headset = scanHeadset(am)
+                vm.headset = Headsets.scan(context, am)
             }
         }
         am.registerAudioDeviceCallback(callback, null)

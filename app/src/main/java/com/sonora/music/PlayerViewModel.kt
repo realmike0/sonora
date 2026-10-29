@@ -112,7 +112,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     // --- Cuffie ---
-    var headset by mutableStateOf<String?>(null)
+    var headset by mutableStateOf<HeadsetInfo?>(null)
     var headsetDismissed by mutableStateOf(false)
 
     private var controller: MediaController? = null

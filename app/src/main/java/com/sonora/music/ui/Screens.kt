@@ -114,6 +114,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.core.content.ContextCompat
+import com.sonora.music.Headsets
 import com.sonora.music.PlayerViewModel
 import com.sonora.music.Track
 import com.sonora.music.toTrack
@@ -250,6 +251,7 @@ fun SonoraScreen(vm: PlayerViewModel) {
         }
 
         BannerHost(vm, Modifier.align(Alignment.TopCenter).fillMaxWidth(if (wide) 0.64f else 1f))
+        HeadsetWatcher(vm)
 
         if (vm.playerOpen && vm.nowPlaying != null && !wide) {
             FullPlayer(
@@ -259,6 +261,9 @@ fun SonoraScreen(vm: PlayerViewModel) {
             )
         }
     }
+
+    // Dispositivo audio collegato: modello 3D + "Inizia ad ascoltare".
+    DeviceSheet(vm)
 
     vm.menuTrack?.let { track ->
         TrackMenuSheet(vm, track, onDismiss = { vm.menuTrack = null })
@@ -308,17 +313,21 @@ private fun ProfileButton(vm: PlayerViewModel) {
     }
 }
 
-/** Android 13+: serve il permesso per mostrare la notifica dei controlli multimediali. */
+/** Chiede i permessi utili: notifiche (Android 13+) e Bluetooth (Android 12+, per riconoscere cuffie e speaker). */
 @Composable
 private fun AskNotificationPermission() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
     val context = LocalContext.current
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        Headsets.startService(context)
+    }
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        val granted = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.POST_NOTIFICATIONS
-        ) == PackageManager.PERMISSION_GRANTED
-        if (!granted) launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        val wanted = buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) add(Manifest.permission.BLUETOOTH_CONNECT)
+        }.filter {
+            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (wanted.isNotEmpty()) launcher.launch(wanted.toTypedArray())
     }
 }
 

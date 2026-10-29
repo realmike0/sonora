@@ -48,6 +48,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.composed
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Shader
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -136,6 +151,27 @@ fun AodScreen(vm: PlayerViewModel) {
         }
     }
 
+    // Alla comparsa di una notifica nuova: glow neon che gira attorno al suo rettangolo per qualche secondo.
+    val seen = remember { mutableSetOf<String>() }
+    var primed by remember { mutableStateOf(false) }
+    var glowKey by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        delay(1500)
+        seen.addAll(NotifHub.items.map { it.key })
+        primed = true
+    }
+    val keys = NotifHub.items.map { it.key }
+    LaunchedEffect(keys, primed) {
+        if (!primed) return@LaunchedEffect
+        val fresh = keys.firstOrNull { it !in seen }
+        seen.addAll(keys)
+        if (fresh != null) {
+            glowKey = fresh
+            delay(6000)
+            if (glowKey == fresh) glowKey = null
+        }
+    }
+
     val np = vm.nowPlaying
     val soft = Color.White.copy(alpha = 0.8f)
 
@@ -183,8 +219,10 @@ fun AodScreen(vm: PlayerViewModel) {
                     } else if (NotifHub.items.isEmpty()) {
                         Text("Nessuna notifica", style = MaterialTheme.typography.bodyMedium, color = soft)
                     } else {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(NotifHub.items.toList(), key = { it.key }) { NotifRow(it) }
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            items(NotifHub.items.toList(), key = { it.key }) {
+                                NotifRow(it, glow = it.key == glowKey)
+                            }
                         }
                     }
                 }
@@ -229,43 +267,99 @@ fun AodScreen(vm: PlayerViewModel) {
 }
 
 @Composable
-private fun NotifRow(n: NotifItem) {
-    Row(
+private fun NotifRow(n: NotifItem, glow: Boolean) {
+    Box(
         Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color.White.copy(alpha = 0.08f))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+            .then(if (glow) Modifier.neonGlow() else Modifier)
     ) {
-        if (n.icon != null) {
-            Image(
-                bitmap = n.icon,
-                contentDescription = null,
-                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White.copy(alpha = 0.85f)),
-                modifier = Modifier.size(22.dp)
-            )
-        } else {
-            Spacer(Modifier.size(22.dp))
-        }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                listOf(n.app, n.title).filter { it.isNotBlank() }.joinToString(" • "),
-                style = MaterialTheme.typography.labelMedium,
-                color = Color.White.copy(alpha = 0.85f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (n.text.isNotBlank()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(if (glow) Color(0xFF0B0F1E) else Color.White.copy(alpha = 0.08f))
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (n.icon != null) {
+                Image(
+                    bitmap = n.icon,
+                    contentDescription = null,
+                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White.copy(alpha = 0.85f)),
+                    modifier = Modifier.size(22.dp)
+                )
+            } else {
+                Spacer(Modifier.size(22.dp))
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
                 Text(
-                    n.text,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.65f),
+                    listOf(n.app, n.title).filter { it.isNotBlank() }.joinToString(" • "),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.85f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                if (n.text.isNotBlank()) {
+                    Text(
+                        n.text,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.65f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
+        }
+    }
+}
+
+/** Pennello a gradiente conico che ruota: i colori neon "corrono" attorno al bordo. */
+private class SpinBrush(private val angle: Float, private val colors: IntArray) : ShaderBrush() {
+    override fun createShader(size: Size): Shader {
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val shader = android.graphics.SweepGradient(cx, cy, colors, null)
+        val m = android.graphics.Matrix()
+        m.postRotate(angle, cx, cy)
+        shader.setLocalMatrix(m)
+        return shader
+    }
+}
+
+private val NEON = intArrayOf(
+    0xFF00F0FF.toInt(), 0xFF7A5CFF.toInt(), 0xFFFF2BD6.toInt(), 0xFF7A5CFF.toInt(), 0xFF00F0FF.toInt()
+)
+
+/** Glow neon circolare attorno al rettangolo: strati sempre più larghi e trasparenti attorno a un filo luminoso. */
+private fun Modifier.neonGlow(): Modifier = composed {
+    val transition = rememberInfiniteTransition(label = "neon")
+    val angle = transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing)),
+        label = "neonAngle"
+    )
+    val pulse = transition.animateFloat(
+        initialValue = 0.75f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "neonPulse"
+    )
+    drawBehind {
+        val brush = SpinBrush(angle.value, NEON)
+        val corner = 16.dp.toPx()
+        val layers = listOf(18.dp to 0.07f, 12.dp to 0.12f, 7.dp to 0.25f, 3.dp to 0.95f)
+        for ((w, a) in layers) {
+            val stroke = w.toPx()
+            drawRoundRect(
+                brush = brush,
+                topLeft = Offset(0f, 0f),
+                size = size,
+                cornerRadius = CornerRadius(corner + stroke / 2f),
+                style = Stroke(width = stroke),
+                alpha = a * pulse.value
+            )
         }
     }
 }

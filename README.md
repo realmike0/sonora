@@ -6,7 +6,7 @@
 Ascolta in background, salva i brani offline, leggi i testi sincronizzati.
 
 ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
-![Versione](https://img.shields.io/badge/versione-0.40--beta-6750A4)
+![Versione](https://img.shields.io/badge/versione-0.41--beta-6750A4)
 ![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
 
 [⬇️ **Scarica l'APK**](https://github.com/realmike0/sonora/releases) · [💬 **Canale Telegram**](https://t.me/sonoraclient)
@@ -34,7 +34,7 @@ Sonora è un'app Android per ascoltare musica da YouTube Music **con i colori de
 - 🗂️ **Raccolta** con due sezioni separate: *In cache* e *Scaricati*.
 - ⚙️ **Gestione della memoria**: scegli il limite della cache (1, 2, 5, 10 GB o illimitata) o svuotala quando vuoi.
 - 🔄 **Aggiornamenti automatici**: Sonora controlla le release su GitHub e li installa da solo.
-- 🎧 **Cuffie**: quando colleghi le cuffie compare un avviso con "Inizia ad ascoltare" (preferiti in ordine casuale).
+- 🎧 **Cuffie, auricolari, speaker e auto**: quando si collegano, anche ad app chiusa, arriva una notifica blu con "Inizia ad ascoltare" (preferiti in ordine casuale). Con l'app aperta compare una schermata con un modello 3D che gira.
 - 🎚️ **Mixaggio fluido** tra un brano e l'altro e **testi** con sfocatura sopra e sotto la riga corrente.
 - 📱 **Tablet** in orizzontale: interfaccia a due pannelli. **Telefono** in orizzontale: modalità AOD con ora, notifiche e brano.
 - ℹ️ **Menu del brano** (pressione prolungata): durata, data di pubblicazione, aggiungi ai preferiti o a una playlist, scarica.

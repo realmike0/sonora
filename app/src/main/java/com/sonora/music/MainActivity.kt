@@ -19,6 +19,7 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        Headsets.startService(this)
         setContent {
             SonoraTheme {
                 SonoraRoot(vm)
@@ -32,7 +33,13 @@ class MainActivity : ComponentActivity() {
         vm.playerOpen = false
     }
 
+    override fun onStart() {
+        super.onStart()
+        AppState.visible = true
+    }
+
     override fun onStop() {
+        AppState.visible = false
         vm.playerOpen = false
         super.onStop()
     }
