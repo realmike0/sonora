@@ -19,7 +19,7 @@ Ascolta in background, salva i brani offline, leggi i testi sincronizzati.
 
 Sonora è un'app Android per ascoltare musica da YouTube Music **con i colori del tuo telefono**: l'interfaccia segue Material You e si adatta allo sfondo che hai scelto. La musica continua anche con lo schermo spento o l'app in background, con i controlli nella notifica e nella schermata di blocco.
 
-È un progetto indipendente, nato e portato avanti da **realmike0**, ed è in **beta**: arrivano aggiornamenti spesso.
+È un progetto indipendente, nato in Italia e portato avanti da **realmike0**, ed è in **beta**: arrivano aggiornamenti spesso.
 
 ## 🚀 Cosa puoi fare
 
