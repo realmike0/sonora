@@ -139,12 +139,11 @@ class PlaybackService : MediaSessionService() {
         return super.onStartCommand(intent, flags, startId)
     }
 
-    /** "Inizia ad ascoltare" dalla notifica: preferiti in ordine casuale, senza aprire l'app. */
+    /** "Inizia ad ascoltare" dalla notifica: parte un brano a caso tra i preferiti (poi continuano gli altri, in ordine casuale). */
     private fun startFavorites() {
         androidx.core.app.NotificationManagerCompat.from(this).cancel(Headsets.ID_HEADSET)
         val player = session?.player ?: return
-        val liked = Store(this).liked.toList()
-        val tracks = liked.ifEmpty { HomeRepository.loadCached(filesDir)?.picks.orEmpty() }.shuffled()
+        val tracks = Store(this).liked.toList().shuffled()
         if (tracks.isEmpty()) return
         player.setMediaItems(
             tracks.map { it.toMediaItem().buildUpon().setUri(trackUri(it.id)).build() },

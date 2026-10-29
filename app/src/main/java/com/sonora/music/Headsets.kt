@@ -169,49 +169,60 @@ object Headsets {
         }
     }
 
-    /** Notifica blu personalizzata con il pulsante "Inizia ad ascoltare" (funziona senza aprire l'app). */
-    fun notifyConnected(context: Context, info: HeadsetInfo) {
-        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
+    private const val BLUE = 0xFF1F5BFF.toInt()
+
+    private fun openApp(context: Context): PendingIntent = PendingIntent.getActivity(
+        context, 2,
+        Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    )
+
+    /** Notifica discreta che tiene viva l'app. */
+    fun keepAliveNotification(context: Context): Notification {
         ensureChannels(context)
+        return NotificationCompat.Builder(context, CH_KEEPALIVE)
+            .setSmallIcon(R.drawable.ic_splash_logo)
+            .setContentTitle("Sonora è pronta")
+            .setContentText("Riconosco cuffie, auricolari e speaker quando si collegano")
+            .setContentIntent(openApp(context))
+            .setOngoing(true)
+            .setSilent(true)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .build()
+    }
 
-        val variant = (1..2).random()
-        val bmp = BitmapFactory.decodeResource(context.resources, frameRes(context, info.kind, variant, 6))
-
+    /**
+     * Notifica "dispositivo collegato" in stile Material (come quella del timer dell'orologio) ma blu:
+     * titolo, nome del dispositivo e il pulsante di testo "Inizia ad ascoltare".
+     * È la notifica del servizio in primo piano, perciò Android la colora davvero.
+     */
+    fun connectedNotification(context: Context, info: HeadsetInfo): Notification {
+        ensureChannels(context)
+        val large = try {
+            BitmapFactory.decodeResource(context.resources, frameRes(context, info.kind, (1..2).random(), 6))
+        } catch (e: Exception) {
+            null
+        }
         val start = PendingIntent.getService(
             context, 1,
-            Intent(context, PlaybackService::class.java).setAction(ACTION_START_FAVORITES),
+            Intent(context, HeadsetService::class.java).setAction(ACTION_START_FAVORITES),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        val open = PendingIntent.getActivity(
-            context, 2,
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        val views = RemoteViews(context.packageName, R.layout.notif_headset).apply {
-            setImageViewBitmap(R.id.notif_image, bmp)
-            setTextViewText(R.id.notif_title, info.kind.title)
-            setTextViewText(R.id.notif_name, info.name)
-            setOnClickPendingIntent(R.id.notif_button, start)
-        }
-
-        val n = NotificationCompat.Builder(context, CH_HEADSET)
+        return NotificationCompat.Builder(context, CH_HEADSET)
             .setSmallIcon(R.drawable.ic_splash_logo)
-            .setColor(0xFF2F7BFF.toInt())
-            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
-            .setCustomContentView(views)
-            .setCustomBigContentView(views)
-            .setContentIntent(open)
-            .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
+            .setContentTitle(info.kind.title)
+            .setContentText(info.name)
+            .setLargeIcon(large)
+            .setColor(BLUE)
+            .setColorized(true)
+            .setContentIntent(openApp(context))
+            .addAction(0, "Inizia ad ascoltare", start)
+            .setOngoing(true)
+            .setOnlyAlertOnce(false)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .setTimeoutAfter(5 * 60 * 1000L)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
-        try {
-            NotificationManagerCompat.from(context).notify(ID_HEADSET, n)
-        } catch (e: SecurityException) {
-            // permesso notifiche mancante
-        }
     }
 }
 
@@ -221,29 +232,37 @@ class HeadsetService : Service() {
     private var callback: AudioDeviceCallback? = null
     private var lastKey: String? = null
     private var lastTime = 0L
+    private val handler = Handler(Looper.getMainLooper())
+    private val restore = Runnable { showKeepAlive() }
+
+    private fun fgsType(): Int =
+        if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
+
+    private fun showKeepAlive() {
+        try {
+            ServiceCompat.startForeground(this, Headsets.ID_KEEPALIVE, Headsets.keepAliveNotification(this), fgsType())
+            NotificationManagerCompat.from(this).cancel(Headsets.ID_HEADSET)
+        } catch (e: Exception) {
+            // ignorato
+        }
+    }
+
+    private fun showConnected(info: HeadsetInfo) {
+        handler.removeCallbacks(restore)
+        try {
+            ServiceCompat.startForeground(this, Headsets.ID_HEADSET, Headsets.connectedNotification(this, info), fgsType())
+            // Dopo due minuti senza risposta torna la notifica discreta.
+            handler.postDelayed(restore, 2 * 60 * 1000L)
+        } catch (e: Exception) {
+            showKeepAlive()
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         Headsets.ensureChannels(this)
-
-        val open = PendingIntent.getActivity(
-            this, 3, Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        val n: Notification = NotificationCompat.Builder(this, Headsets.CH_KEEPALIVE)
-            .setSmallIcon(R.drawable.ic_splash_logo)
-            .setContentTitle("Sonora è pronta")
-            .setContentText("Riconosco cuffie, auricolari e speaker quando si collegano")
-            .setContentIntent(open)
-            .setOngoing(true)
-            .setSilent(true)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
-            .build()
         try {
-            ServiceCompat.startForeground(
-                this, Headsets.ID_KEEPALIVE, n,
-                if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
-            )
+            ServiceCompat.startForeground(this, Headsets.ID_KEEPALIVE, Headsets.keepAliveNotification(this), fgsType())
         } catch (e: Exception) {
             stopSelf()
             return
@@ -260,18 +279,31 @@ class HeadsetService : Service() {
                 if (info.name == lastKey && now - lastTime < 20_000L) return
                 lastKey = info.name
                 lastTime = now
-                Headsets.notifyConnected(this@HeadsetService, info)
+                showConnected(info)
             }
         }
         callback = cb
-        am.registerAudioDeviceCallback(cb, Handler(Looper.getMainLooper()))
+        am.registerAudioDeviceCallback(cb, handler)
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == Headsets.ACTION_START_FAVORITES) {
+            // Tocco su "Inizia ad ascoltare": torna la notifica discreta e parte un brano dei preferiti.
+            handler.removeCallbacks(restore)
+            showKeepAlive()
+            try {
+                startService(Intent(this, PlaybackService::class.java).setAction(Headsets.ACTION_START_FAVORITES))
+            } catch (e: Exception) {
+                // ignorato
+            }
+        }
+        return START_STICKY
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        handler.removeCallbacks(restore)
         callback?.let {
             (getSystemService(Context.AUDIO_SERVICE) as AudioManager).unregisterAudioDeviceCallback(it)
         }
