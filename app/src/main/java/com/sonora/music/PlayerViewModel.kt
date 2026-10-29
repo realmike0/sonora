@@ -153,6 +153,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         val context = getApplication<Application>()
         val prefs = context.getSharedPreferences("sonora", android.content.Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
+        if (!manual && !prefs.getBoolean("auto_update_check", true)) return
         if (!manual && now - prefs.getLong("upd_last", 0L) < 3 * 60 * 60 * 1000L) return
         checkingUpdate = true
         updateMessage = null

@@ -6,7 +6,7 @@
 Ascolta in background, salva i brani offline, leggi i testi sincronizzati.
 
 ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
-![Versione](https://img.shields.io/badge/versione-0.41.1--beta-6750A4)
+![Versione](https://img.shields.io/badge/versione-0.41.2--beta-6750A4)
 ![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
 
 [⬇️ **Scarica l'APK**](https://github.com/realmike0/sonora/releases) · [💬 **Canale Telegram**](https://t.me/sonoraclient)
@@ -48,6 +48,14 @@ Sonora è un'app Android per ascoltare musica da YouTube Music **con i colori de
 4. Su Android 13+ accetta le notifiche, servono per i controlli di riproduzione.
 
 **Requisiti:** Android 8.0 (API 26) o successivo.
+
+### 🔄 Aggiornamenti con Obtainium
+
+Per ricevere automaticamente ogni nuova versione puoi usare [Obtainium](https://github.com/ImranR98/Obtainium):
+
+[➕ **Aggiungi Sonora a Obtainium**](obtainium://add/https://github.com/realmike0/sonora)
+
+Oppure, in Obtainium, tocca *Aggiungi app*, incolla `https://github.com/realmike0/sonora` e attiva **Includi pre-release** (le versioni beta sono pre-release). Se usi Obtainium, puoi spegnere il controllo automatico in *Impostazioni → Aggiornamenti* di Sonora.
 
 ## 🔧 Come funziona
 

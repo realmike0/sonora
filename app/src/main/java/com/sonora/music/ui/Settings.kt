@@ -261,11 +261,26 @@ private fun UpdateSection(vm: PlayerViewModel, version: String) {
     OutlinedButton(onClick = { vm.checkUpdate(manual = true) }, enabled = !vm.checkingUpdate) {
         Text(if (vm.checkingUpdate) "Controllo…" else "Controlla aggiornamenti")
     }
-    Text(
-        "Sonora controlla da solo le nuove release su GitHub quando apri l'app.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("sonora", android.content.Context.MODE_PRIVATE) }
+    var auto by remember { mutableStateOf(prefs.getBoolean("auto_update_check", true)) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Controllo automatico", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Cerca nuove release su GitHub quando apri l'app. Spegnilo se aggiorni con Obtainium.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        androidx.compose.material3.Switch(
+            checked = auto,
+            onCheckedChange = {
+                auto = it
+                prefs.edit().putBoolean("auto_update_check", it).apply()
+            }
+        )
+    }
 }
 
 @Composable
