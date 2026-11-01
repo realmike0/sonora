@@ -3,6 +3,7 @@ package com.sonora.music.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -144,9 +145,10 @@ fun GenreScreen(vm: PlayerViewModel, genre: String, bottomPad: Dp, onBack: () ->
 }
 
 /** Copertina quadrata con il titolo sotto, come gli album. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-internal fun AlbumCard(album: AlbumItem, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Column(modifier.clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick)) {
+internal fun AlbumCard(album: AlbumItem, modifier: Modifier = Modifier, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
+    Column(modifier.clip(RoundedCornerShape(20.dp)).combinedClickable(onClick = onClick, onLongClick = onLongClick)) {
         Artwork(album.thumb, Modifier.fillMaxWidth().aspectRatio(1f), RoundedCornerShape(20.dp), px = 400)
         Text(
             album.title,

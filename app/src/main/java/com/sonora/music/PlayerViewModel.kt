@@ -50,6 +50,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     var queueOpen by mutableStateOf(false)
     var videoOn by mutableStateOf(false)
     var shuffleOn by mutableStateOf(false)
+    var commentsOpen by mutableStateOf(false)
     var translateOn by mutableStateOf(false)
     var translation by mutableStateOf<List<String>?>(null)
     var translating by mutableStateOf(false)

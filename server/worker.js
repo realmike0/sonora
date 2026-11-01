@@ -22,6 +22,97 @@ async function newToken(env, uid) {
   return token;
 }
 
+
+// ───────── Sonora ID (email + password): sincronizza i brani preferiti ─────────
+async function pbkdf2(pw, saltHex) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveBits"]);
+  const salt = Uint8Array.from(saltHex.match(/../g).map((h) => parseInt(h, 16)));
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 100000 }, key, 256);
+  return [...new Uint8Array(bits)].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+const sameStr = (a, b) => {
+  if (a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+};
+// Conta i tentativi per ora; restituisce true se il limite è superato.
+async function tooMany(env, key, max) {
+  const k = key + ":" + Math.floor(Date.now() / 3600000);
+  const row = await env.DB.prepare("SELECT n FROM rl WHERE k=?").bind(k).first();
+  if (row && row.n >= max) return true;
+  await env.DB.prepare("INSERT INTO rl(k,n) VALUES(?,1) ON CONFLICT(k) DO UPDATE SET n=n+1").bind(k).run();
+  return false;
+}
+async function newSidToken(env, uid) {
+  const token = rnd(32);
+  await env.DB.prepare("INSERT INTO sid_tokens(token_hash,user_id) VALUES(?,?)").bind(await sha(token), uid).run();
+  return token;
+}
+async function sidFrom(req, env) {
+  const m = (req.headers.get("authorization") || "").match(/^Bearer (.+)$/);
+  if (!m) return null;
+  const r = await env.DB.prepare("SELECT user_id FROM sid_tokens WHERE token_hash=?").bind(await sha(m[1])).first();
+  return r ? r.user_id : null;
+}
+async function sonoraId(req, env, path) {
+  const ip = (await sha(req.headers.get("cf-connecting-ip") || "x")).slice(0, 24);
+  if (req.method === "POST" && path === "/v1/id/register") {
+    const { email: raw, password } = await req.json();
+    if (!validEmail(raw)) return err("Email non valida");
+    if (typeof password !== "string" || password.length < 8 || password.length > 200) return err("La password deve avere almeno 8 caratteri");
+    if (await tooMany(env, "reg:" + ip, 10)) return err("Troppi tentativi, riprova più tardi", 429);
+    const eh = await sha("sid:" + raw.trim().toLowerCase());
+    if (await env.DB.prepare("SELECT 1 FROM sid_users WHERE email_hash=?").bind(eh).first()) return err("Esiste già un Sonora ID con questa email", 409);
+    const salt = rnd(16);
+    const uid = "sid_" + rnd(12);
+    await env.DB.prepare("INSERT INTO sid_users(email_hash,user_id,salt,pw_hash,created) VALUES(?,?,?,?,?)")
+      .bind(eh, uid, salt, await pbkdf2(password, salt), Date.now()).run();
+    return J({ token: await newSidToken(env, uid) });
+  }
+  if (req.method === "POST" && path === "/v1/id/login") {
+    const { email: raw, password } = await req.json();
+    if (!validEmail(raw) || typeof password !== "string" || password.length > 200) return err("Email o password non corretti", 401);
+    const eh = await sha("sid:" + raw.trim().toLowerCase());
+    if ((await tooMany(env, "login:" + eh, 10)) || (await tooMany(env, "loginip:" + ip, 40))) return err("Troppi tentativi, riprova più tardi", 429);
+    const u = await env.DB.prepare("SELECT user_id,salt,pw_hash FROM sid_users WHERE email_hash=?").bind(eh).first();
+    if (!u || !sameStr(await pbkdf2(password, u.salt), u.pw_hash)) return err("Email o password non corretti", 401);
+    return J({ token: await newSidToken(env, u.user_id) });
+  }
+  const uid = await sidFrom(req, env);
+  if (!uid) return err("Non autorizzato", 401);
+  if (req.method === "POST" && path === "/v1/id/sync") {
+    const { likes, removed } = await req.json();
+    const L = Array.isArray(likes) ? likes.slice(0, 1000) : [];
+    const R = Array.isArray(removed) ? removed.slice(0, 1000) : [];
+    const now = Date.now();
+    const up = env.DB.prepare("INSERT OR IGNORE INTO sid_likes(user_id,track_id,title,artist,thumb,dur,ts) VALUES(?,?,?,?,?,?,?)");
+    const del = env.DB.prepare("DELETE FROM sid_likes WHERE user_id=? AND track_id=?");
+    const batch = [
+      ...L.filter((t) => t && typeof t.id === "string").map((t, i) =>
+        up.bind(uid, t.id.slice(0, 40), String(t.title || "").slice(0, 200), String(t.artist || "").slice(0, 200), String(t.thumb || "").slice(0, 400), Math.max(0, +t.dur || 0), now - i)),
+      ...R.filter((x) => typeof x === "string").map((x) => del.bind(uid, x.slice(0, 40))),
+    ];
+    if (batch.length) await env.DB.batch(batch);
+    const rows = await env.DB.prepare("SELECT track_id,title,artist,thumb,dur FROM sid_likes WHERE user_id=? ORDER BY ts DESC LIMIT 5000").bind(uid).all();
+    return J({ likes: rows.results.map((r) => ({ id: r.track_id, title: r.title, artist: r.artist, thumb: r.thumb, dur: r.dur })) });
+  }
+  if (req.method === "POST" && path === "/v1/id/logout") {
+    const m = (req.headers.get("authorization") || "").match(/^Bearer (.+)$/);
+    await env.DB.prepare("DELETE FROM sid_tokens WHERE token_hash=?").bind(await sha(m[1])).run();
+    return J({ ok: true });
+  }
+  if (req.method === "DELETE" && path === "/v1/id") {
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM sid_likes WHERE user_id=?").bind(uid),
+      env.DB.prepare("DELETE FROM sid_tokens WHERE user_id=?").bind(uid),
+      env.DB.prepare("DELETE FROM sid_users WHERE user_id=?").bind(uid),
+    ]);
+    return J({ ok: true });
+  }
+  return err("Non trovato", 404);
+}
+
 async function telegramUpdate(env, u) {
   const m = u.message;
   if (!m || !m.chat || m.chat.type !== "private") return;
@@ -152,6 +243,8 @@ export default {
         await env.DB.prepare("DELETE FROM tg_sessions WHERE sid_hash=?").bind(sh).run();
         return J({ token: row.token });
       }
+
+      if (path.startsWith("/v1/id")) return await sonoraId(req, env, path);
 
       const uid = await userFrom(req, env);
       if (!uid) return err("Non autorizzato", 401);

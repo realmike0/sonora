@@ -26,6 +26,7 @@ class SonoraApp : Application(), ImageLoaderFactory {
         AudioPrefs.load(this)
         PlayLog.init(this)
         Tracking.init(this)
+        SonoraId.init(this)
         NewPipe.init(
             YtDownloader(Http.client),
             Localization("it", "IT"),

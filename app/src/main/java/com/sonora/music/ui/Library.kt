@@ -60,6 +60,20 @@ import androidx.compose.ui.unit.dp
 import com.sonora.music.AlbumItem
 import com.sonora.music.AudioStore
 import com.sonora.music.CACHE_ID
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import com.sonora.music.DOWNLOADS_ID
 import com.sonora.music.LIKED_ID
 import com.sonora.music.PlayerViewModel
@@ -116,37 +130,52 @@ private fun LibraryHome(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit
         }
 
         item {
+            var menu by remember { mutableStateOf(false) }
+            Box {
             PlaylistCard(
                 title = "Brani che ti piacciono",
                 subtitle = "${store.liked.size} brani",
                 cover = null,
                 heart = true,
-                onClick = { onOpen(LIKED_ID) }
+                onClick = { onOpen(LIKED_ID) },
+                onLongClick = { menu = true }
             )
+                LibraryMenu(menu, { menu = false }, vm, store.liked.toList(), true)
+            }
         }
 
         item {
             val downloadedCount = store.played.count { it.id in AudioStore.downloadedIds }
+            var menu by remember { mutableStateOf(false) }
+            Box {
             PlaylistCard(
                 title = "Scaricati",
                 subtitle = "$downloadedCount brani · disponibili offline",
                 cover = null,
                 heart = false,
                 icon = Icons.Rounded.Download,
-                onClick = { onOpen(DOWNLOADS_ID) }
+                onClick = { onOpen(DOWNLOADS_ID) },
+                onLongClick = { menu = true }
             )
+                LibraryMenu(menu, { menu = false }, vm, store.played.filter { it.id in AudioStore.downloadedIds }, false)
+            }
         }
 
         item {
             val cachedCount = store.played.count { it.id in AudioStore.cachedIds }
+            var menu by remember { mutableStateOf(false) }
+            Box {
             PlaylistCard(
                 title = "In cache",
                 subtitle = "$cachedCount brani · salvati automaticamente",
                 cover = null,
                 heart = false,
                 icon = Icons.Rounded.Storage,
-                onClick = { onOpen(CACHE_ID) }
+                onClick = { onOpen(CACHE_ID) },
+                onLongClick = { menu = true }
             )
+                LibraryMenu(menu, { menu = false }, vm, store.played.filter { it.id in AudioStore.cachedIds }, false)
+            }
         }
 
         item {
@@ -164,10 +193,15 @@ private fun LibraryHome(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 row.forEach { p ->
-                    AlbumCard(
-                        AlbumItem(p.name, "", p.tracks.firstOrNull()?.thumb, p.id),
-                        Modifier.weight(1f)
-                    ) { onOpen(p.id) }
+                    var menu by remember { mutableStateOf(false) }
+                    Box(Modifier.weight(1f)) {
+                        AlbumCard(
+                            AlbumItem(p.name, "", p.tracks.firstOrNull()?.thumb, p.id),
+                            Modifier.fillMaxWidth(),
+                            onLongClick = { menu = true }
+                        ) { onOpen(p.id) }
+                        LibraryMenu(menu, { menu = false }, vm, p.tracks, false)
+                    }
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
@@ -185,6 +219,7 @@ private fun LibraryHome(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PlaylistCard(
     title: String,
@@ -193,13 +228,16 @@ private fun PlaylistCard(
     heart: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    icon: androidx.compose.ui.graphics.vector.ImageVector? = null
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    onLongClick: (() -> Unit)? = null
 ) {
     Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
-        modifier = modifier.fillMaxWidth()
+        shape = RoundedCornerShape(AppStyle.card),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (AppStyle.id == StyleId.EXPRESSIVE) 0.45f else AppStyle.cardAlpha),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(AppStyle.card))
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) {
@@ -288,47 +326,121 @@ private fun PlaylistDetail(vm: PlayerViewModel, id: String, bottomPad: androidx.
     var addTrack by remember { mutableStateOf<Track?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = tr("Indietro"))
-            }
-            Text(
-                title,
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            if (!isSpecial) {
-                IconButton(onClick = { confirmDelete = true }) {
-                    Icon(Icons.Rounded.Delete, contentDescription = tr("Elimina playlist"))
-                }
-            }
-        }
+    val accent = MaterialTheme.colorScheme.primary
+    var menu by remember { mutableStateOf(false) }
+    val cover = tracks.firstOrNull()?.thumb
 
-        Row(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-            FilledTonalButton(onClick = { vm.play(tracks, 0) }, enabled = tracks.isNotEmpty()) {
-                Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(tr("Riproduci"))
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomPad + 16.dp)) {
+        item(key = "head") {
+            Column(Modifier.statusBarsPadding().fillMaxWidth()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RoundBtn(onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = tr("Indietro")) }
+                    Spacer(Modifier.weight(1f))
+                    if (!isSpecial) {
+                        RoundBtn({ confirmDelete = true }) { Icon(Icons.Rounded.Delete, contentDescription = tr("Elimina playlist")) }
+                    }
+                }
+                // Copertina nel cerchio ondulato, come la pagina dell'artista.
+                Box(Modifier.fillMaxWidth().padding(horizontal = 56.dp), contentAlignment = Alignment.Center) {
+                    val special = isSpecial || cover == null
+                    if (special) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .clip(CookieShape)
+                                .background(
+                                    when {
+                                        isLikedList -> MaterialTheme.colorScheme.primaryContainer
+                                        isDownloads -> MaterialTheme.colorScheme.tertiaryContainer
+                                        else -> MaterialTheme.colorScheme.secondaryContainer
+                                    }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                when {
+                                    isLikedList -> Icons.Rounded.Favorite
+                                    isDownloads -> Icons.Rounded.Download
+                                    isCache -> Icons.Rounded.Storage
+                                    else -> Icons.Rounded.PlayArrow
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(96.dp),
+                                tint = when {
+                                    isLikedList -> MaterialTheme.colorScheme.onPrimaryContainer
+                                    isDownloads -> MaterialTheme.colorScheme.onTertiaryContainer
+                                    else -> MaterialTheme.colorScheme.onSecondaryContainer
+                                }
+                            )
+                        }
+                    } else {
+                        Artwork(cover, Modifier.fillMaxWidth().aspectRatio(1f), CookieShape, px = 600)
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    title,
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    RoundBtn({ if (tracks.isNotEmpty()) vm.play(tracks.shuffled(), 0) }, 60.dp) {
+                        Icon(Icons.Rounded.Shuffle, contentDescription = tr("Casuale"))
+                    }
+                    Button(
+                        onClick = { vm.play(tracks, 0) },
+                        enabled = tracks.isNotEmpty(),
+                        modifier = Modifier.weight(1f).height(60.dp)
+                    ) {
+                        Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(tr("RIPRODUCI"), fontWeight = FontWeight.ExtraBold)
+                    }
+                    Box {
+                        RoundBtn({ menu = true }, 60.dp) { Icon(Icons.Rounded.MoreVert, contentDescription = tr("Opzioni")) }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text(tr("Scarica tutti")) },
+                                onClick = { tracks.forEach { vm.download(it) }; menu = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(tr("Aggiungi alla coda")) },
+                                onClick = { tracks.forEach { vm.addToQueue(it) }; menu = false }
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
             }
         }
 
         if (tracks.isEmpty()) {
-            Message(
-                when {
-                    isLikedList -> "Tocca il cuore su un brano per salvarlo qui"
-                    isCache -> "I brani che ascolti vengono salvati qui in automatico"
-                    isDownloads -> "Tieni premuto su un brano e scegli Scarica"
-                    else -> "Questa playlist è vuota"
-                }
-            )
+            item(key = "empty") {
+                Text(
+                    when {
+                        isLikedList -> "Tocca il cuore su un brano per salvarlo qui"
+                        isCache -> "I brani che ascolti vengono salvati qui in automatico"
+                        isDownloads -> "Tieni premuto su un brano e scegli Scarica"
+                        else -> "Questa playlist è vuota"
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         } else {
-            LazyColumn(contentPadding = PaddingValues(bottom = bottomPad + 16.dp)) {
                 itemsIndexed(tracks, key = { _, t -> t.id }) { index, track ->
                     TrackRow(
                         track = track,
@@ -367,7 +479,6 @@ private fun PlaylistDetail(vm: PlayerViewModel, id: String, bottomPad: androidx.
                         }
                     )
                 }
-            }
         }
     }
 
@@ -386,5 +497,33 @@ private fun PlaylistDetail(vm: PlayerViewModel, id: String, bottomPad: androidx.
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(tr("Annulla")) } }
         )
+    }
+}
+
+@Composable
+private fun LibraryMenu(expanded: Boolean, onDismiss: () -> Unit, vm: PlayerViewModel, tracks: List<Track>, sync: Boolean) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text(tr("Scarica tutti")) },
+            onClick = {
+                tracks.forEach { vm.download(it) }
+                onDismiss()
+            }
+        )
+        if (sync) {
+            DropdownMenuItem(
+                text = { Text(tr(if (com.sonora.music.SonoraId.signedIn) "Sincronizza ora con Sonora ID" else "Accedi a Sonora ID")) },
+                onClick = {
+                    if (com.sonora.music.SonoraId.signedIn) {
+                        scope.launch { com.sonora.music.SonoraId.sync(context, vm.store) }
+                    } else {
+                        vm.settingsOpen = true
+                    }
+                    onDismiss()
+                }
+            )
+        }
     }
 }

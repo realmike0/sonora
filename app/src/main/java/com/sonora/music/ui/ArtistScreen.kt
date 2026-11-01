@@ -188,7 +188,7 @@ internal val CookieShape = object : androidx.compose.ui.graphics.Shape {
 }
 
 @Composable
-private fun RoundBtn(onClick: () -> Unit, size: androidx.compose.ui.unit.Dp = 48.dp, content: @Composable () -> Unit) {
+internal fun RoundBtn(onClick: () -> Unit, size: androidx.compose.ui.unit.Dp = 48.dp, content: @Composable () -> Unit) {
     Box(
         Modifier.size(size).clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)

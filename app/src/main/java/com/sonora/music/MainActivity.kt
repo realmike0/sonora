@@ -24,6 +24,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         Perf.init(this)
         com.sonora.music.ui.Lang.load(this)
+        com.sonora.music.ui.AppStyle.load(this)
         WrappedReminder.schedule(this)
         handleIntent(intent)
         Headsets.startService(this)

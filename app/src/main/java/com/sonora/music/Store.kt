@@ -51,6 +51,7 @@ fun JSONArray.toTracks(): List<Track> =
  * (file JSON privato dell'app + SharedPreferences).
  */
 class Store(context: Context) {
+    private val appContext = context.applicationContext
 
     private val prefs = context.getSharedPreferences("sonora", Context.MODE_PRIVATE)
     private val file = File(context.filesDir, "library.json")
@@ -158,7 +159,19 @@ class Store(context: Context) {
 
     fun toggleLike(track: Track) {
         val i = liked.indexOfFirst { it.id == track.id }
-        if (i >= 0) liked.removeAt(i) else liked.add(0, track)
+        if (i >= 0) {
+            liked.removeAt(i)
+            SonoraId.onUnlike(appContext, track.id)
+        } else {
+            liked.add(0, track)
+        }
+        save()
+    }
+
+    /** Dopo la sincronizzazione con Sonora ID: i preferiti diventano quelli del server (che include anche i locali). */
+    fun setLikedFromSync(remote: List<Track>) {
+        liked.clear()
+        liked.addAll(remote)
         save()
     }
 

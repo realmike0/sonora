@@ -56,15 +56,11 @@ private val SonoraTypography: Typography = Typography().let { t ->
 fun SonoraTheme(content: @Composable () -> Unit) {
     val dark = isSystemInDarkTheme()
     val context = LocalContext.current
-    val colors = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        dark -> darkColorScheme()
-        else -> lightColorScheme()
-    }
+    val colors = styleScheme(context, dark)
 
     MaterialTheme(
         colorScheme = colors,
+        shapes = AppStyle.shapes,
         typography = SonoraTypography
     ) {
         // Superficie di base: il colore del testo segue sempre lo sfondo (nero su chiaro, bianco su scuro).
