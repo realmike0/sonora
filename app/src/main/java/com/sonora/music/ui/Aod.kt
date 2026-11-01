@@ -203,18 +203,6 @@ fun AodScreen(vm: PlayerViewModel) {
                         ),
                         color = Color.White.copy(alpha = 0.9f)
                     )
-                    Spacer(Modifier.height(8.dp))
-                    if (!access) {
-                        // Senza accesso alle notifiche (non richiesto dall'app) mostriamo solo data, ora e brano.
-                    } else if (NotifHub.items.isEmpty()) {
-                        Text("Nessuna notifica", style = MaterialTheme.typography.bodyMedium, color = soft)
-                    } else {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            items(NotifHub.items.toList(), key = { it.key }) {
-                                NotifRow(it, glow = it.key == glowKey)
-                            }
-                        }
-                    }
                 }
 
                 // Destra: brano

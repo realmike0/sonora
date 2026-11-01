@@ -55,11 +55,6 @@ fun AudioQualitySection() {
         level = levels[it].first
         AudioPrefs.save(c, codec, level)
     }
-    Text(
-        "FLAC e MP3 non sono disponibili: YouTube offre solo AAC e Opus. I brani già in cache mantengono la qualità con cui sono stati scaricati.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
 }
 
 @Composable
@@ -106,12 +101,6 @@ fun PerfSection() {
     val c = LocalContext.current
     val modes = PerfMode.values()
     Chips(modes.map { it.label }, Perf.mode.value.ordinal) { Perf.setMode(c, modes[it]) }
-    Text(
-        (if (Perf.lite.value) "Grafica leggera attiva (sfocature e animazioni infinite spente). " else "Grafica completa. ") + Perf.summary,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 2.dp)
-    )
 }
 
 @Composable

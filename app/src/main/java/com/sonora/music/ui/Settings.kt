@@ -96,19 +96,25 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
 
             SettingsCard("Profilo") {
                 Text(store.userName.ifBlank { "Ospite" }, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Account locale: Mi piace e playlist sono salvati su questo telefono.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (store.googleCookie == null) {
+                    Text(
+                        "Account locale",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                GoogleSection(vm)
             }
 
             SettingsCard("Testi") {
                 LyricsSourcePicker(store)
             }
 
-            SettingsCard("Wrapped e tracciamento") {
-                TrackingSection(onWrapped = { vm.wrappedOpen = true; vm.settingsOpen = false })
+            // Il Wrapped compare solo a dicembre, a fine anno.
+            if (java.time.LocalDate.now().monthValue == 12) {
+                SettingsCard("Wrapped e tracciamento") {
+                    TrackingSection(onWrapped = { vm.wrappedOpen = true; vm.settingsOpen = false })
+                }
             }
 
             SettingsCard("Qualità audio") {
@@ -123,8 +129,11 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
                 FadeSection()
             }
 
-            SettingsCard("Prestazioni e tocco") {
+            SettingsCard("Prestazioni") {
                 PerfSection()
+            }
+
+            SettingsCard("Tocco") {
                 HapticsSection()
             }
 
@@ -134,14 +143,6 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
 
             SettingsCard("Aggiornamenti") {
                 UpdateSection(vm, version)
-            }
-
-            SettingsCard("Modalità orizzontale (telefono)") {
-                NotificationAccessSection()
-            }
-
-            SettingsCard("Account Google") {
-                GoogleSection(vm)
             }
 
             SettingsCard("Memoria e cache") {
@@ -165,11 +166,6 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
 
             SettingsCard("Informazioni") {
                 Text("Sonora $version", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Versione beta. I brani ascoltati vengono salvati in cache; quelli scaricati restano offline nella Raccolta.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
 
             // Filigrana: in fondo alla pagina, scorre insieme al resto (non resta sovrapposta).
@@ -226,33 +222,27 @@ private fun KeepAliveSection() {
     val context = LocalContext.current
     var on by remember { mutableStateOf(com.sonora.music.Headsets.keepAliveEnabled(context)) }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text("Riconosci cuffie e speaker", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Anche ad app chiusa: quando colleghi cuffie, auricolari, speaker o auto arriva una notifica blu con \"Inizia ad ascoltare\".",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Text("Riconosci cuffie e speaker", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
         androidx.compose.material3.Switch(
             checked = on,
             onCheckedChange = {
                 on = it
                 com.sonora.music.Headsets.setKeepAlive(context, it)
+                // Il permesso si chiede quando si scopre la funzione, una volta sola.
+                val prefs = context.getSharedPreferences("sonora", android.content.Context.MODE_PRIVATE)
+                if (it && !prefs.getBoolean("battery_asked", false)) {
+                    prefs.edit().putBoolean("battery_asked", true).apply()
+                    try {
+                        context.startActivity(
+                            android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    } catch (e: Exception) {
+                    }
+                }
             }
         )
     }
-    OutlinedButton(onClick = {
-        context.startActivity(
-            android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
-    }) { Text("Non limitare la batteria") }
-    Text(
-        "Alcuni telefoni chiudono le app in background: consenti Sonora senza limiti per non perdere il rilevamento.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
 }
 
 @Composable
@@ -282,14 +272,7 @@ private fun UpdateSection(vm: PlayerViewModel, version: String) {
     val prefs = remember { context.getSharedPreferences("sonora", android.content.Context.MODE_PRIVATE) }
     var auto by remember { mutableStateOf(prefs.getBoolean("auto_update_check", true)) }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text("Controllo automatico", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Cerca nuove release su GitHub quando apri l'app. Spegnilo se aggiorni con Obtainium.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Text("Controllo automatico", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
         androidx.compose.material3.Switch(
             checked = auto,
             onCheckedChange = {
@@ -297,25 +280,6 @@ private fun UpdateSection(vm: PlayerViewModel, version: String) {
                 prefs.edit().putBoolean("auto_update_check", it).apply()
             }
         )
-    }
-}
-
-@Composable
-private fun NotificationAccessSection() {
-    val context = LocalContext.current
-    var access by remember { mutableStateOf(com.sonora.music.NotifHub.hasAccess(context)) }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        while (true) {
-            access = com.sonora.music.NotifHub.hasAccess(context)
-            kotlinx.coroutines.delay(2_000)
-        }
-    }
-    Text(
-        "Ruotando il telefono in orizzontale Sonora mostra data, ora e il brano, con luminosità ridotta.",
-        style = MaterialTheme.typography.bodyMedium
-    )
-    if (access) {
-        Text("Accesso alle notifiche attivo", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -353,11 +317,6 @@ private fun LyricsSourcePicker(store: Store) {
             }
         }
     }
-    Text(
-        "Auto prova tutte le fonti insieme e sceglie il testo migliore: sincronizzato, con la durata giusta e dalla fonte più affidabile.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
 }
 
 @Composable
@@ -365,15 +324,9 @@ private fun GoogleSection(vm: PlayerViewModel) {
     val store = vm.store
 
     if (store.googleCookie == null) {
-        Text(
-            "Collega il tuo account per importare tutte le playlist di YouTube Music.",
-            style = MaterialTheme.typography.bodyMedium
-        )
         Button(onClick = { vm.loginOpen = true }) { Text("Collega account Google") }
         return
     }
-
-    Text("Account collegato", style = MaterialTheme.typography.titleMedium)
 
     when (vm.syncState) {
         SyncState.Running -> {
@@ -435,13 +388,6 @@ private fun CacheSection() {
     val limit = AudioStore.cacheLimitGb
     var confirmClear by remember { mutableStateOf(false) }
 
-    Text(
-        "I brani che ascolti vengono salvati in automatico. Quando si supera il limite, " +
-            "vengono eliminati prima i meno recenti. I brani scaricati non vengono mai toccati.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-
     val limitText = if (limit <= 0) "illimitata" else "$limit GB"
     Text(
         "In cache: ${formatBytes(AudioStore.cacheUsedBytes)} (limite $limitText)",
@@ -459,12 +405,6 @@ private fun CacheSection() {
             color = MaterialTheme.colorScheme.error
         )
     }
-    Text(
-        "I file sono nella memoria privata dell'app (non visibili con il gestore file): " +
-            "per vedere i brani apri Raccolta → In cache.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
     Text(
         "Scaricati: ${formatBytes(AudioStore.downloadsUsedBytes)}",
         style = MaterialTheme.typography.bodyMedium,

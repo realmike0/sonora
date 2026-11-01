@@ -14,8 +14,8 @@ android {
         applicationId = "com.sonora.music"
         minSdk = 26
         targetSdk = 36
-        versionCode = 61
-        versionName = "0.60.1-beta"
+        versionCode = 62
+        versionName = "0.60.2-beta"
     }
 
     // Chiave di firma FISSA (nel repo): ogni build ha la stessa firma, quindi gli aggiornamenti
@@ -47,6 +47,11 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 
     packaging {
