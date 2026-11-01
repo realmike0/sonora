@@ -212,7 +212,7 @@ fun AodScreen(vm: PlayerViewModel) {
                     verticalArrangement = Arrangement.Center
                 ) {
                     if (np == null) {
-                        Text("Nessun brano in riproduzione", style = MaterialTheme.typography.titleMedium, color = soft)
+                        Text(tr("Nessun brano in riproduzione"), style = MaterialTheme.typography.titleMedium, color = soft)
                     } else {
                         Artwork(
                             np.artwork,
@@ -354,7 +354,7 @@ fun PlayerControls(vm: PlayerViewModel, compact: Boolean, showSkip10: Boolean) {
     ) {
         if (showSkip10) {
             MorphIconButton(onClick = { vm.seekBy(-10_000) }, size = 44.dp) {
-                Icon(Icons.Rounded.Replay10, contentDescription = "Indietro di 10 secondi")
+                Icon(Icons.Rounded.Replay10, contentDescription = tr("Indietro di 10 secondi"))
             }
         }
         MorphIconButton(onClick = vm::previous, size = s) {
@@ -366,7 +366,7 @@ fun PlayerControls(vm: PlayerViewModel, compact: Boolean, showSkip10: Boolean) {
         }
         if (showSkip10) {
             MorphIconButton(onClick = { vm.seekBy(10_000) }, size = 44.dp) {
-                Icon(Icons.Rounded.Forward10, contentDescription = "Avanti di 10 secondi")
+                Icon(Icons.Rounded.Forward10, contentDescription = tr("Avanti di 10 secondi"))
             }
         }
     }
@@ -381,7 +381,7 @@ fun NowPlayingPane(vm: PlayerViewModel, modifier: Modifier = Modifier) {
             BlurBackdrop(np?.artwork, dim = 0.55f)
             if (np == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Scegli un brano per iniziare", color = Color.White.copy(alpha = 0.75f))
+                    Text(tr("Scegli un brano per iniziare"), color = Color.White.copy(alpha = 0.75f))
                 }
             } else {
                 Column(

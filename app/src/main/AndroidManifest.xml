@@ -56,6 +56,13 @@
         </service>
 
 
+        <receiver android:name=".WrappedReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="com.sonora.music.WRAPPED_READY" />
+            </intent-filter>
+        </receiver>
+
         <receiver android:name=".NowWidget" android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

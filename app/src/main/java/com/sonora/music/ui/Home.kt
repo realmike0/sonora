@@ -66,7 +66,7 @@ fun HomeScreen(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit.Dp, modi
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(16.dp))
-            FilledTonalButton(onClick = { vm.loadHome(force = true) }) { Text("Riprova") }
+            FilledTonalButton(onClick = { vm.loadHome(force = true) }) { Text(tr("Riprova")) }
         }
 
         else -> LazyColumn(
@@ -83,7 +83,7 @@ fun HomeScreen(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit.Dp, modi
                         )
                     }
                     Text(
-                        "Scelte del giorno",
+                        tr("Scelte del giorno"),
                         style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
                     )
                 }
@@ -101,7 +101,7 @@ fun HomeScreen(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit.Dp, modi
                 ) {
                     Icon(Icons.Rounded.PlayArrow, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Riproduci le scelte")
+                    Text(tr("Riproduci le scelte"))
                 }
             }
 

@@ -43,7 +43,7 @@ fun QueueSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
                 modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
             )
             if (vm.queue.isEmpty()) {
-                Text("Niente in coda", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(8.dp))
+                Text(tr("Niente in coda"), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(8.dp))
             }
             LazyColumn {
                 itemsIndexed(vm.queue, key = { i, t -> "$i-${t.id}" }) { i, t ->
@@ -75,10 +75,10 @@ fun QueueSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
                             )
                         }
                         if (i > 0) IconButton(onClick = { vm.moveInQueue(i, i - 1) }) {
-                            Icon(Icons.Rounded.ArrowUpward, contentDescription = "Sposta su")
+                            Icon(Icons.Rounded.ArrowUpward, contentDescription = tr("Sposta su"))
                         }
                         if (!current) IconButton(onClick = { vm.removeFromQueue(i) }) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Rimuovi")
+                            Icon(Icons.Rounded.Close, contentDescription = tr("Rimuovi"))
                         }
                     }
                 }

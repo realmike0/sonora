@@ -57,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.sonora.music.AlbumItem
 import com.sonora.music.AudioStore
 import com.sonora.music.CACHE_ID
 import com.sonora.music.DOWNLOADS_ID
@@ -101,7 +102,7 @@ private fun LibraryHome(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit
         item {
             Column(Modifier.padding(start = 8.dp, top = 16.dp, bottom = 8.dp)) {
                 Text(
-                    "Raccolta",
+                    tr("Raccolta"),
                     style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold)
                 )
                 if (store.userName.isNotBlank()) {
@@ -152,19 +153,24 @@ private fun LibraryHome(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit
             FilledTonalButton(onClick = { showNew = true }) {
                 Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Nuova playlist")
+                Text(tr("Nuova playlist"))
             }
         }
 
-        items(store.playlists, key = { it.id }) { p ->
-            PlaylistCard(
-                title = p.name,
-                subtitle = "${p.tracks.size} brani" + if (p.fromGoogle) " · da YouTube Music" else "",
-                cover = p.tracks.firstOrNull()?.thumb,
-                heart = false,
-                onClick = { onOpen(p.id) },
-                modifier = Modifier.animateItem()
-            )
+        // Le playlist si vedono come gli album: copertina quadrata e solo il nome.
+        items(store.playlists.chunked(2), key = { row -> row.first().id }) { row ->
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 4.dp).animateItem(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                row.forEach { p ->
+                    AlbumCard(
+                        AlbumItem(p.name, "", p.tracks.firstOrNull()?.thumb, p.id),
+                        Modifier.weight(1f)
+                    ) { onOpen(p.id) }
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
         }
     }
 
@@ -288,7 +294,7 @@ private fun PlaylistDetail(vm: PlayerViewModel, id: String, bottomPad: androidx.
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Indietro")
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = tr("Indietro"))
             }
             Text(
                 title,
@@ -299,7 +305,7 @@ private fun PlaylistDetail(vm: PlayerViewModel, id: String, bottomPad: androidx.
             )
             if (!isSpecial) {
                 IconButton(onClick = { confirmDelete = true }) {
-                    Icon(Icons.Rounded.Delete, contentDescription = "Elimina playlist")
+                    Icon(Icons.Rounded.Delete, contentDescription = tr("Elimina playlist"))
                 }
             }
         }
@@ -308,7 +314,7 @@ private fun PlaylistDetail(vm: PlayerViewModel, id: String, bottomPad: androidx.
             FilledTonalButton(onClick = { vm.play(tracks, 0) }, enabled = tracks.isNotEmpty()) {
                 Icon(Icons.Rounded.PlayArrow, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Riproduci")
+                Text(tr("Riproduci"))
             }
         }
 
@@ -336,7 +342,7 @@ private fun PlaylistDetail(vm: PlayerViewModel, id: String, bottomPad: androidx.
                             isCache -> {
                                 {
                                     IconButton(onClick = { vm.download(track) }) {
-                                        Icon(Icons.Rounded.Download, contentDescription = "Scarica")
+                                        Icon(Icons.Rounded.Download, contentDescription = tr("Scarica"))
                                     }
                                 }
                             }
@@ -344,7 +350,7 @@ private fun PlaylistDetail(vm: PlayerViewModel, id: String, bottomPad: androidx.
                             isDownloads -> {
                                 {
                                     IconButton(onClick = { vm.removeOffline(track.id) }) {
-                                        Icon(Icons.Rounded.Delete, contentDescription = "Rimuovi dai download")
+                                        Icon(Icons.Rounded.Delete, contentDescription = tr("Rimuovi dai download"))
                                     }
                                 }
                             }
@@ -352,7 +358,7 @@ private fun PlaylistDetail(vm: PlayerViewModel, id: String, bottomPad: androidx.
                             !isLikedList -> {
                                 {
                                     IconButton(onClick = { store.removeFromPlaylist(id, track.id) }) {
-                                        Icon(Icons.Rounded.Close, contentDescription = "Rimuovi dalla playlist")
+                                        Icon(Icons.Rounded.Close, contentDescription = tr("Rimuovi dalla playlist"))
                                     }
                                 }
                             }
@@ -370,15 +376,15 @@ private fun PlaylistDetail(vm: PlayerViewModel, id: String, bottomPad: androidx.
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Eliminare la playlist?") },
+            title = { Text(tr("Eliminare la playlist?")) },
             text = { Text("«$title» verrà rimossa da questo telefono.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
                     store.deletePlaylist(id)
-                }) { Text("Elimina") }
+                }) { Text(tr("Elimina")) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Annulla") } }
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(tr("Annulla")) } }
         )
     }
 }

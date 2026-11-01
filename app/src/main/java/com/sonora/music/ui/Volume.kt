@@ -113,7 +113,7 @@ fun VolumePill(modifier: Modifier = Modifier) {
         ) {
             Icon(out.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Icon(volumeIcon(vol, max), contentDescription = "Volume", tint = Color.White, modifier = Modifier.size(20.dp))
+            Icon(volumeIcon(vol, max), contentDescription = tr("Volume"), tint = Color.White, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(6.dp))
             Text("${vol * 100 / max}%", color = Color.White, style = MaterialTheme.typography.labelLarge)
         }

@@ -45,12 +45,12 @@ fun AudioQualitySection() {
     var level by remember { mutableStateOf(AudioPrefs.level) }
     val codecs = listOf("m4a" to "M4A (AAC)", "webm" to "WebM (Opus)")
     val levels = listOf("high" to "Alta", "medium" to "Media", "low" to "Bassa (risparmio dati)")
-    Text("Formato", style = MaterialTheme.typography.labelMedium)
+    Text(tr("Formato"), style = MaterialTheme.typography.labelMedium)
     Chips(codecs.map { it.second }, codecs.indexOfFirst { it.first == codec }) {
         codec = codecs[it].first
         AudioPrefs.save(c, codec, level)
     }
-    Text("Qualità", style = MaterialTheme.typography.labelMedium)
+    Text(tr("Qualità"), style = MaterialTheme.typography.labelMedium)
     Chips(levels.map { it.second }, levels.indexOfFirst { it.first == level }) {
         level = levels[it].first
         AudioPrefs.save(c, codec, level)
@@ -66,16 +66,16 @@ fun FadeSection() {
     var inn by remember { mutableFloatStateOf(p.getInt("fade_in_ms", 2500) / 1000f) }
     var curve by remember { mutableStateOf(p.getInt("fade_curve", 0)) }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text("Dissolvenza tra i brani", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+        Text(tr("Dissolvenza tra i brani"), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
         Switch(checked = on, onCheckedChange = { on = it; p.edit().putBoolean("mix_fade", it).apply() })
     }
     if (on) {
         var overlap by remember { mutableStateOf(p.getBoolean("mix_overlap", true)) }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Sovrapposizione vera", style = MaterialTheme.typography.titleSmall)
+                Text(tr("Sovrapposizione vera"), style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "I due brani suonano insieme (con la grafica leggera si usa la dissolvenza semplice).",
+                    tr("I due brani suonano insieme (con la grafica leggera si usa la dissolvenza semplice)."),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -88,7 +88,7 @@ fun FadeSection() {
         Text("Ingresso: %.1f s".format(inn), style = MaterialTheme.typography.labelMedium)
         Slider(value = inn, onValueChange = { inn = it }, valueRange = 0f..12f,
             onValueChangeFinished = { p.edit().putInt("fade_in_ms", (inn * 1000).toInt()).apply() })
-        Text("Curva", style = MaterialTheme.typography.labelMedium)
+        Text(tr("Curva"), style = MaterialTheme.typography.labelMedium)
         Chips(listOf("Morbida", "Lineare", "Radiofonica"), curve) {
             curve = it
             p.edit().putInt("fade_curve", it).apply()
@@ -110,9 +110,9 @@ fun HapticsSection() {
     var on by remember { mutableStateOf(p.getBoolean("haptics", true)) }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text("Feedback aptico al tocco", style = MaterialTheme.typography.titleMedium)
+            Text(tr("Feedback aptico al tocco"), style = MaterialTheme.typography.titleMedium)
             Text(
-                "Una vibrazione leggerissima quando tocchi qualcosa.",
+                tr("Una vibrazione leggerissima quando tocchi qualcosa."),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -126,7 +126,7 @@ fun EqualizerSection() {
     val c = LocalContext.current
     val info = remember { com.sonora.music.Eq.info() }
     if (info == null) {
-        Text("Avvia un brano per regolare l'equalizzatore (o il telefono non lo supporta).", style = MaterialTheme.typography.bodySmall)
+        Text(tr("Avvia un brano per regolare l'equalizzatore (o il telefono non lo supporta)."), style = MaterialTheme.typography.bodySmall)
         return
     }
     var on by remember { mutableStateOf(com.sonora.music.Eq.enabled(c)) }
@@ -136,7 +136,7 @@ fun EqualizerSection() {
     fun save() = com.sonora.music.Eq.save(c, on, levels, bass.toInt(), loud.toInt())
 
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text("Equalizzatore", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+        Text(tr("Equalizzatore"), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
         Switch(checked = on, onCheckedChange = { on = it; save() })
     }
     if (on) {
@@ -152,9 +152,9 @@ fun EqualizerSection() {
                 onValueChangeFinished = { save() }
             )
         }
-        Text("Bassi", style = MaterialTheme.typography.labelMedium)
+        Text(tr("Bassi"), style = MaterialTheme.typography.labelMedium)
         Slider(value = bass, onValueChange = { bass = it }, valueRange = 0f..1000f, onValueChangeFinished = { save() })
-        Text("Volume extra", style = MaterialTheme.typography.labelMedium)
+        Text(tr("Volume extra"), style = MaterialTheme.typography.labelMedium)
         Slider(value = loud, onValueChange = { loud = it }, valueRange = 0f..1000f, onValueChangeFinished = { save() })
     }
 }

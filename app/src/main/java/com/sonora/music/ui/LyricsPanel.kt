@@ -54,7 +54,7 @@ fun LyricsPanel(vm: PlayerViewModel, modifier: Modifier = Modifier) {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    "Testo non disponibile per questo brano",
+                    tr("Testo non disponibile per questo brano"),
                     style = MaterialTheme.typography.bodyLarge,
                     color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.75f),
                     textAlign = TextAlign.Center
@@ -91,6 +91,7 @@ private fun LyricsList(vm: PlayerViewModel, lyrics: Lyrics) {
         itemsIndexed(lyrics.lines) { index, line ->
             LyricLineItem(
                 text = line.text,
+                sub = if (vm.translateOn) vm.translation?.getOrNull(index)?.takeIf { it.isNotBlank() && it != line.text } else null,
                 active = !lyrics.synced || index == active,
                 distance = if (lyrics.synced) kotlin.math.abs(index - active) else 0,
                 onClick = if (lyrics.synced) ({ vm.seekToMs(line.timeMs) }) else null
@@ -100,7 +101,7 @@ private fun LyricsList(vm: PlayerViewModel, lyrics: Lyrics) {
 }
 
 @Composable
-private fun LyricLineItem(text: String, active: Boolean, distance: Int, onClick: (() -> Unit)?) {
+private fun LyricLineItem(text: String, sub: String?, active: Boolean, distance: Int, onClick: (() -> Unit)?) {
     val lineAlpha by animateFloatAsState(
         targetValue = if (active) 1f else (0.5f - 0.06f * distance).coerceAtLeast(0.2f),
         animationSpec = tween(300),
@@ -112,9 +113,7 @@ private fun LyricLineItem(text: String, active: Boolean, distance: Int, onClick:
         label = "lineScale"
     )
 
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+    androidx.compose.foundation.layout.Column(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
@@ -126,5 +125,14 @@ private fun LyricLineItem(text: String, active: Boolean, distance: Int, onClick:
             // Solo la riga attuale è nitida: sopra e sotto il testo si sfoca sempre di più.
             .then(if (!active && distance > 0) Modifier.softBlur((distance * 1.6f).coerceAtMost(7f).dp) else Modifier)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-    )
+    ) {
+        Text(text = text, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
+        if (sub != null) {
+            Text(
+                text = sub,
+                style = MaterialTheme.typography.bodyLarge,
+                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f)
+            )
+        }
+    }
 }

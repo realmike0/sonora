@@ -92,7 +92,7 @@ private fun UpdateCard(vm: PlayerViewModel, rel: Updater.Release) {
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "Aggiornamento disponibile",
+                        tr("Aggiornamento disponibile"),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
                     Text(
@@ -113,7 +113,7 @@ private fun UpdateCard(vm: PlayerViewModel, rel: Updater.Release) {
                 Button(onClick = { vm.downloadUpdate() }, enabled = progress == null) {
                     Text(if (progress == null) "Scarica e installa" else "Scarico… ${(progress * 100).toInt()}%")
                 }
-                TextButton(onClick = { vm.updateDismissed = true }) { Text("Dopo") }
+                TextButton(onClick = { vm.updateDismissed = true }) { Text(tr("Dopo")) }
             }
         }
     }

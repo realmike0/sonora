@@ -189,7 +189,7 @@ private fun NameStep(name: String, onName: (String) -> Unit, onNext: () -> Unit)
                 value = name,
                 onValueChange = onName,
                 singleLine = true,
-                placeholder = { Text("Il tuo nome") },
+                placeholder = { Text(tr("Il tuo nome")) },
                 shape = CircleShape,
                 colors = TextFieldDefaults.colors(
                     focusedIndicatorColor = Color.Transparent,
@@ -219,12 +219,12 @@ private fun NameStep(name: String, onName: (String) -> Unit, onNext: () -> Unit)
                 onClick = onNext,
                 enabled = name.isNotBlank(),
                 modifier = Modifier.fillMaxWidth().height(56.dp)
-            ) { Text("Continua") }
+            ) { Text(tr("Continua")) }
         }
         Spacer(Modifier.height(12.dp))
         Reveal(enabled = titleDone, delayMs = 500) {
             Text(
-                "Te lo chiediamo una volta sola.",
+                tr("Te lo chiediamo una volta sola."),
                 style = MaterialTheme.typography.bodyMedium,
                 color = LocalContentColor.current.copy(alpha = 0.78f)
             )
@@ -263,16 +263,16 @@ private fun GoogleStep(name: String, onConnect: () -> Unit, onSkip: () -> Unit) 
                 colors = onbButtonColors(),
                 onClick = onConnect,
                 modifier = Modifier.fillMaxWidth().height(56.dp)
-            ) { Text("Collega account Google") }
+            ) { Text(tr("Collega account Google")) }
         }
         Spacer(Modifier.height(8.dp))
         Reveal(enabled = questionDone, delayMs = 200) {
-            TextButton(onClick = onSkip, colors = onbTextButtonColors()) { Text("Salta") }
+            TextButton(onClick = onSkip, colors = onbTextButtonColors()) { Text(tr("Salta")) }
         }
         Spacer(Modifier.height(8.dp))
         Reveal(enabled = questionDone, delayMs = 400) {
             Text(
-                "Se salti, creiamo un profilo locale: Mi piace e playlist restano su questo telefono.",
+                tr("Se salti, creiamo un profilo locale: Mi piace e playlist restano su questo telefono."),
                 style = MaterialTheme.typography.bodySmall,
                 color = LocalContentColor.current.copy(alpha = 0.78f),
                 textAlign = TextAlign.Center
@@ -305,13 +305,13 @@ private fun SyncStep(vm: PlayerViewModel, name: String) {
                         colors = onbButtonColors(),
                         onClick = { vm.syncGoogle() },
                         modifier = Modifier.fillMaxWidth().height(56.dp)
-                    ) { Text("Riprova") }
+                    ) { Text(tr("Riprova")) }
                 }
                 Reveal(delayMs = 800) {
                     TextButton(colors = onbTextButtonColors(), onClick = {
                         vm.disconnectGoogle()
                         vm.finishOnboarding(name)
-                    }) { Text("Continua senza account Google") }
+                    }) { Text(tr("Continua senza account Google")) }
                 }
             }
 

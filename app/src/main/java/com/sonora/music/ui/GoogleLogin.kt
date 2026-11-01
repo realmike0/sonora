@@ -54,9 +54,9 @@ fun GoogleLoginScreen(onCookie: (String) -> Unit, onClose: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onClose) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Chiudi")
+                    Icon(Icons.Rounded.Close, contentDescription = tr("Chiudi"))
                 }
-                Text("Accedi a Google", style = MaterialTheme.typography.titleMedium)
+                Text(tr("Accedi a Google"), style = MaterialTheme.typography.titleMedium)
             }
 
             AndroidView(

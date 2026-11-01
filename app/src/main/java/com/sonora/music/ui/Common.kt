@@ -345,7 +345,7 @@ fun TrackRow(
         }
         LikeButton(liked = liked, onClick = onLike)
         IconButton(onClick = onMore) {
-            Icon(Icons.Rounded.MoreVert, contentDescription = "Altro")
+            Icon(Icons.Rounded.MoreVert, contentDescription = tr("Altro"))
         }
         trailing?.invoke()
     }
@@ -356,19 +356,19 @@ fun NewPlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
     var name by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Nuova playlist") },
+        title = { Text(tr("Nuova playlist")) },
         text = {
             TextField(
                 value = name,
                 onValueChange = { name = it },
                 singleLine = true,
-                placeholder = { Text("Nome della playlist") }
+                placeholder = { Text(tr("Nome della playlist")) }
             )
         },
         confirmButton = {
-            TextButton(onClick = { onCreate(name) }, enabled = name.isNotBlank()) { Text("Crea") }
+            TextButton(onClick = { onCreate(name) }, enabled = name.isNotBlank()) { Text(tr("Crea")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Annulla")) } }
     )
 }
 
@@ -389,7 +389,7 @@ fun AddToPlaylistDialog(store: Store, track: Track, onDismiss: () -> Unit) {
         val mine = store.playlists.filter { !it.fromGoogle }
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Aggiungi a playlist") },
+            title = { Text(tr("Aggiungi a playlist")) },
             text = {
                 LazyColumn(Modifier.heightIn(max = 320.dp)) {
                     item {
@@ -404,7 +404,7 @@ fun AddToPlaylistDialog(store: Store, track: Track, onDismiss: () -> Unit) {
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = onDismiss) { Text("Chiudi") } }
+            dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Chiudi")) } }
         )
     }
 }

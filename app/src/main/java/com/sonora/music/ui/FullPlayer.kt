@@ -42,6 +42,7 @@ import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -116,6 +117,7 @@ fun FullPlayer(vm: PlayerViewModel, onDismiss: () -> Unit, onArtist: (String) ->
     var showLyrics by remember { mutableStateOf(false) }
     var addTrack by remember { mutableStateOf<Track?>(null) }
 
+    LaunchedEffect(vm.lyrics, vm.translateOn) { vm.ensureTranslation() }
     LaunchedEffect(Unit) {
         progress.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow))
     }
@@ -226,7 +228,7 @@ fun FullPlayer(vm: PlayerViewModel, onDismiss: () -> Unit, onArtist: (String) ->
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         MorphIconButton(onClick = { closing = true }, size = 44.dp, container = Color.Black.copy(alpha = 0.35f)) {
-                            Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Chiudi", Modifier.size(28.dp))
+                            Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = tr("Chiudi"), Modifier.size(28.dp))
                         }
                         Spacer(Modifier.weight(1f))
                         MorphIconButton(
@@ -236,12 +238,19 @@ fun FullPlayer(vm: PlayerViewModel, onDismiss: () -> Unit, onArtist: (String) ->
                             Icon(Icons.Rounded.Videocam, "Video", tint = if (vm.videoOn) Color.Black else Color.White)
                         }
                         Spacer(Modifier.width(8.dp))
+                        MorphIconButton(
+                            onClick = { vm.toggleTranslate() }, size = 44.dp,
+                            container = if (vm.translateOn) Color.White.copy(alpha = 0.9f) else Color.Black.copy(alpha = 0.35f)
+                        ) {
+                            Icon(Icons.Rounded.Translate, tr("Traduci testo"), tint = if (vm.translateOn) Color.Black else Color.White)
+                        }
+                        Spacer(Modifier.width(8.dp))
                         MorphIconButton(onClick = { vm.queueOpen = true }, size = 44.dp, container = Color.Black.copy(alpha = 0.35f)) {
-                            Icon(Icons.Rounded.QueueMusic, contentDescription = "Coda")
+                            Icon(Icons.Rounded.QueueMusic, contentDescription = tr("Coda"))
                         }
                         Spacer(Modifier.width(8.dp))
                         MorphIconButton(onClick = { vm.menuTrack = np.toTrack() }, size = 44.dp, container = Color.Black.copy(alpha = 0.35f)) {
-                            Icon(Icons.Rounded.MoreVert, contentDescription = "Altro")
+                            Icon(Icons.Rounded.MoreVert, contentDescription = tr("Altro"))
                         }
                     }
 
@@ -315,7 +324,7 @@ fun FullPlayer(vm: PlayerViewModel, onDismiss: () -> Unit, onArtist: (String) ->
     pickArtist?.let { names ->
         AlertDialog(
             onDismissRequest = { pickArtist = null },
-            title = { Text("Scegli l'artista") },
+            title = { Text(tr("Scegli l'artista")) },
             text = {
                 Column {
                     names.forEach { n ->
@@ -327,7 +336,7 @@ fun FullPlayer(vm: PlayerViewModel, onDismiss: () -> Unit, onArtist: (String) ->
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { pickArtist = null }) { Text("Annulla") } }
+            confirmButton = { TextButton(onClick = { pickArtist = null }) { Text(tr("Annulla")) } }
         )
     }
 

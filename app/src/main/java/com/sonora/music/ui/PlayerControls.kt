@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -301,6 +302,10 @@ internal fun LyricsScreen(
             RoundAction(onClick = onClose, size = 44.dp, modifier = Modifier.align(Alignment.CenterStart)) {
                 Icon(Icons.Rounded.KeyboardArrowDown, "Chiudi", Modifier.size(28.dp))
             }
+            RoundAction(
+                onClick = vm::toggleTranslate, size = 44.dp, selected = vm.translateOn,
+                modifier = Modifier.align(Alignment.CenterEnd)
+            ) { Icon(Icons.Rounded.Translate, tr("Traduci testo")) }
             Column(Modifier.align(Alignment.Center).padding(horizontal = 56.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     title, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),

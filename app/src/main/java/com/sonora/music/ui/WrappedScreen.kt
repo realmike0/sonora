@@ -91,7 +91,7 @@ fun WrappedScreen(vm: PlayerViewModel, onClose: () -> Unit) {
     Box(Modifier.backEffect(back).fillMaxSize().background(Color(0xFF0E0E12))) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, contentDescription = "Chiudi", tint = Color.White) }
+                IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, contentDescription = tr("Chiudi"), tint = Color.White) }
                 // Un anno in più ogni 1 gennaio: da quello del primo ascolto fino a quello in corso.
                 val first = remember(stats) {
                     PlayLog.all().minOfOrNull { java.time.Instant.ofEpochMilli(it.ts).atZone(java.time.ZoneId.systemDefault()).year }

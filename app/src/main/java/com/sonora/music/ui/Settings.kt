@@ -86,19 +86,19 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
         ) {
             Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Indietro")
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = tr("Indietro"))
                 }
                 Text(
-                    "Impostazioni",
+                    tr("Impostazioni"),
                     style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold)
                 )
             }
 
-            SettingsCard("Profilo") {
+            SettingsCard(tr("Profilo")) {
                 Text(store.userName.ifBlank { "Ospite" }, style = MaterialTheme.typography.titleMedium)
                 if (store.googleCookie == null) {
                     Text(
-                        "Account locale",
+                        tr("Account locale"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -106,65 +106,69 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
                 GoogleSection(vm)
             }
 
-            SettingsCard("Testi") {
+            SettingsCard(tr("Lingua")) {
+                LanguageSection()
+            }
+
+            SettingsCard(tr("Testi")) {
                 LyricsSourcePicker(store)
             }
 
             // Il Wrapped compare solo a dicembre, a fine anno.
             if (java.time.LocalDate.now().monthValue == 12) {
-                SettingsCard("Wrapped e tracciamento") {
+                SettingsCard(tr("Wrapped e tracciamento")) {
                     TrackingSection(onWrapped = { vm.wrappedOpen = true; vm.settingsOpen = false })
                 }
             }
 
-            SettingsCard("Qualità audio") {
+            SettingsCard(tr("Qualità audio")) {
                 AudioQualitySection()
             }
 
-            SettingsCard("Equalizzatore") {
+            SettingsCard(tr("Equalizzatore")) {
                 EqualizerSection()
             }
 
-            SettingsCard("Dissolvenza avanzata") {
+            SettingsCard(tr("Dissolvenza avanzata")) {
                 FadeSection()
             }
 
-            SettingsCard("Prestazioni") {
+            SettingsCard(tr("Prestazioni")) {
                 PerfSection()
             }
 
-            SettingsCard("Tocco") {
+            SettingsCard(tr("Tocco")) {
                 HapticsSection()
             }
 
-            SettingsCard("Sempre attiva") {
+            SettingsCard(tr("Sempre attiva")) {
                 KeepAliveSection()
             }
 
-            SettingsCard("Aggiornamenti") {
+            SettingsCard(tr("Aggiornamenti")) {
                 UpdateSection(vm, version)
             }
 
-            SettingsCard("Memoria e cache") {
+            SettingsCard(tr("Memoria e cache")) {
                 CacheSection()
             }
 
-            SettingsCard("Community") {
+            SettingsCard(tr("Community")) {
                 Text(
-                    "Novità, aggiornamenti e supporto sul canale Telegram di Sonora.",
+                    tr("Novità, aggiornamenti e supporto sul canale Telegram di Sonora."),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Button(onClick = { uriHandler.openUri("https://t.me/sonoraclient") }) {
-                    Text("Apri su Telegram")
+                    Text(tr("Apri su Telegram"))
                 }
                 Text(
-                    "t.me/sonoraclient",
+                    tr("t.me/sonoraclient"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            SettingsCard("Informazioni") {
+            SettingsCard(tr("Informazioni")) {
                 Text("Sonora $version", style = MaterialTheme.typography.titleMedium)
             }
 
@@ -200,9 +204,9 @@ private fun MixSwitch() {
     var on by remember { mutableStateOf(prefs.getBoolean("mix_fade", true)) }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text("Mixaggio fluido", style = MaterialTheme.typography.titleMedium)
+            Text(tr("Mixaggio fluido"), style = MaterialTheme.typography.titleMedium)
             Text(
-                "Il brano finisce con una dissolvenza e il successivo entra in sfumatura.",
+                tr("Il brano finisce con una dissolvenza e il successivo entra in sfumatura."),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -222,7 +226,7 @@ private fun KeepAliveSection() {
     val context = LocalContext.current
     var on by remember { mutableStateOf(com.sonora.music.Headsets.keepAliveEnabled(context)) }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text("Riconosci cuffie e speaker", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+        Text(tr("Riconosci cuffie e speaker"), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
         androidx.compose.material3.Switch(
             checked = on,
             onCheckedChange = {
@@ -272,7 +276,7 @@ private fun UpdateSection(vm: PlayerViewModel, version: String) {
     val prefs = remember { context.getSharedPreferences("sonora", android.content.Context.MODE_PRIVATE) }
     var auto by remember { mutableStateOf(prefs.getBoolean("auto_update_check", true)) }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text("Controllo automatico", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+        Text(tr("Controllo automatico"), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
         androidx.compose.material3.Switch(
             checked = auto,
             onCheckedChange = {
@@ -280,6 +284,21 @@ private fun UpdateSection(vm: PlayerViewModel, version: String) {
                 prefs.edit().putBoolean("auto_update_check", it).apply()
             }
         )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LanguageSection() {
+    val context = LocalContext.current
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Lang.options.forEach { (code, label) ->
+            FilterChip(
+                selected = Lang.code == code,
+                onClick = { Lang.set(context, code) },
+                label = { Text(if (code == "auto") tr("Automatica") else label) }
+            )
+        }
     }
 }
 
@@ -299,7 +318,7 @@ private fun LyricsSourcePicker(store: Store) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("Fonte predefinita", style = MaterialTheme.typography.labelMedium)
+                    Text(tr("Fonte predefinita"), style = MaterialTheme.typography.labelMedium)
                     Text(store.lyricsSource, style = MaterialTheme.typography.titleMedium)
                 }
                 Text("▾", style = MaterialTheme.typography.titleMedium)
@@ -324,7 +343,7 @@ private fun GoogleSection(vm: PlayerViewModel) {
     val store = vm.store
 
     if (store.googleCookie == null) {
-        Button(onClick = { vm.loginOpen = true }) { Text("Collega account Google") }
+        Button(onClick = { vm.loginOpen = true }) { Text(tr("Collega account Google")) }
         return
     }
 
@@ -344,7 +363,7 @@ private fun GoogleSection(vm: PlayerViewModel) {
         )
 
         SyncState.Done -> Text(
-            "Playlist sincronizzate",
+            tr("Playlist sincronizzate"),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -354,9 +373,9 @@ private fun GoogleSection(vm: PlayerViewModel) {
 
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Button(onClick = { vm.syncGoogle() }, enabled = vm.syncState != SyncState.Running) {
-            Text("Sincronizza ora")
+            Text(tr("Sincronizza ora"))
         }
-        OutlinedButton(onClick = { vm.disconnectGoogle() }) { Text("Scollega") }
+        OutlinedButton(onClick = { vm.disconnectGoogle() }) { Text(tr("Scollega")) }
     }
 }
 
@@ -366,7 +385,7 @@ private fun Watermark(modifier: Modifier = Modifier) {
     val uriHandler = LocalUriHandler.current
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
-            "Made with ❤️ by realmike0 on",
+            tr("Made with ❤️ by realmike0 on"),
             style = MaterialTheme.typography.labelMedium,
             fontStyle = FontStyle.Italic,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -425,22 +444,22 @@ private fun CacheSection() {
     }
 
     OutlinedButton(onClick = { confirmClear = true }, enabled = AudioStore.cacheUsedBytes > 0) {
-        Text("Svuota cache")
+        Text(tr("Svuota cache"))
     }
 
     if (confirmClear) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("Svuotare la cache?") },
-            text = { Text("I brani in cache verranno eliminati. I brani scaricati restano.") },
+            title = { Text(tr("Svuotare la cache?")) },
+            text = { Text(tr("I brani in cache verranno eliminati. I brani scaricati restano.")) },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = {
                     confirmClear = false
                     AudioStore.clearCache()
-                }) { Text("Svuota") }
+                }) { Text(tr("Svuota")) }
             },
             dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { confirmClear = false }) { Text("Annulla") }
+                androidx.compose.material3.TextButton(onClick = { confirmClear = false }) { Text(tr("Annulla")) }
             }
         )
     }

@@ -50,6 +50,11 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     var queueOpen by mutableStateOf(false)
     var videoOn by mutableStateOf(false)
     var shuffleOn by mutableStateOf(false)
+    var translateOn by mutableStateOf(false)
+    var translation by mutableStateOf<List<String>?>(null)
+    var translating by mutableStateOf(false)
+    var translateFailed by mutableStateOf(false)
+    private var translateJob: Job? = null
     var recognizeOpen by mutableStateOf(false)
 
     /** Coda di riproduzione. */
@@ -338,6 +343,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun loadLyrics(np: NowPlaying?) {
         lyricsJob?.cancel()
+        translateJob?.cancel()
+        translating = false
+        translation = null
         lyrics = null
         if (np == null) {
             lyricsLoading = false
@@ -391,6 +399,28 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun playFrom(index: Int) = play(results, index, fromSearch = true)
+
+    fun toggleTranslate() {
+        translateOn = !translateOn
+        translateFailed = false
+        if (translateOn) ensureTranslation()
+    }
+
+    /** Se la traduzione è accesa e manca per questo testo, la scarica. */
+    fun ensureTranslation() {
+        val l = lyrics ?: return
+        if (!translateOn || translation != null || translating) return
+        translating = true
+        translateFailed = false
+        translateJob = viewModelScope.launch {
+            val result = LyricsTranslator.translate(l.lines.map { it.text }, com.sonora.music.ui.Lang.effective())
+            if (lyrics === l) {
+                translation = result
+                translateFailed = result == null
+            }
+            translating = false
+        }
+    }
 
     fun toggleShuffle() {
         val c = controller ?: return

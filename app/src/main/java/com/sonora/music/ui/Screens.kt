@@ -213,6 +213,7 @@ fun SonoraScreen(vm: PlayerViewModel) {
                     when (t) {
                         0 -> HomeScreen(vm, bottomPad)
                         1 -> SearchContent(vm, bottomPad)
+                        2 -> ExploreScreen(vm, bottomPad)
                         else -> LibraryScreen(vm, bottomPad)
                     }
                 }
@@ -348,7 +349,11 @@ private fun AskNotificationPermission() {
 
 @Composable
 private fun SearchContent(vm: PlayerViewModel, bottomPad: Dp, modifier: Modifier = Modifier) {
-    val store = vm.store
+    var genre by rememberSaveable { mutableStateOf<String?>(null) }
+    genre?.let { g ->
+        GenreScreen(vm, g, bottomPad, onBack = { genre = null })
+        return
+    }
 
     Column(modifier.fillMaxSize()) {
         SearchField(vm)
@@ -363,21 +368,8 @@ private fun SearchContent(vm: PlayerViewModel, bottomPad: Dp, modifier: Modifier
 
             vm.error != null && vm.query.isNotBlank() -> Message(vm.error ?: "")
 
-            // Mai cercato nulla: testo di sempre.
-            !store.hasSearched -> Message("Cerca un brano o un artista per iniziare")
-
-            // Ha già cercato: i brani riprodotti dopo le ricerche.
-            store.searchPlays.isEmpty() -> Message("Avvia un brano dai risultati e lo ritroverai qui")
-
-            else -> Column(Modifier.fillMaxSize()) {
-                Text(
-                    "Riprodotti dopo le tue ricerche",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 4.dp)
-                )
-                TrackList(vm, store.searchPlays.toList(), fromSearch = false, bottomPad = bottomPad)
-            }
+            // Nessuna ricerca in corso: generi e brani riprodotti dopo le ricerche.
+            else -> SearchHome(vm, bottomPad, onGenre = { genre = it })
         }
     }
 }
@@ -405,18 +397,18 @@ private fun SearchField(vm: PlayerViewModel) {
     TextField(
         value = vm.query,
         onValueChange = { vm.query = it },
-        placeholder = { Text("Cerca brani, artisti…") },
+        placeholder = { Text(tr("Cerca brani, artisti…")) },
         leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
         trailingIcon = if (vm.query.isNotEmpty()) {
             {
                 IconButton(onClick = { vm.query = "" }) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Cancella")
+                    Icon(Icons.Rounded.Close, contentDescription = tr("Cancella"))
                 }
             }
         } else {
             {
                 IconButton(onClick = { vm.recognizeOpen = true }) {
-                    Icon(Icons.Rounded.Mic, contentDescription = "Riconosci brano")
+                    Icon(Icons.Rounded.Mic, contentDescription = tr("Riconosci brano"))
                 }
             }
         },

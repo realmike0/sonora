@@ -73,20 +73,20 @@ fun RecognizeSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
         ) {
             when (state) {
                 "idle" -> {
-                    Text("Che brano è?", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
-                    Text("Avvicina il telefono alla musica: ascolto per 10 secondi.", textAlign = TextAlign.Center)
+                    Text(tr("Che brano è?"), style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
+                    Text(tr("Avvicina il telefono alla musica: ascolto per 10 secondi."), textAlign = TextAlign.Center)
                     Button(onClick = {
                         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) start()
                         else permission.launch(Manifest.permission.RECORD_AUDIO)
-                    }) { Text("Ascolta") }
+                    }) { Text(tr("Ascolta")) }
                 }
                 "listening" -> {
                     BouncyLoader()
-                    Text("Sto ascoltando…", style = MaterialTheme.typography.titleMedium)
+                    Text(tr("Sto ascoltando…"), style = MaterialTheme.typography.titleMedium)
                 }
                 "searching" -> {
                     BouncyLoader()
-                    Text("Cerco il brano…", style = MaterialTheme.typography.titleMedium)
+                    Text(tr("Cerco il brano…"), style = MaterialTheme.typography.titleMedium)
                 }
                 "found" -> {
                     val r = result!!
@@ -105,16 +105,16 @@ fun RecognizeSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
                                 state = "error"
                             }
                         }
-                    }) { Text("Riproduci") }
-                    OutlinedButton(onClick = { state = "idle" }) { Text("Riprova") }
+                    }) { Text(tr("Riproduci")) }
+                    OutlinedButton(onClick = { state = "idle" }) { Text(tr("Riprova")) }
                 }
                 "none" -> {
-                    Text("Non l'ho riconosciuto", style = MaterialTheme.typography.titleMedium)
-                    Button(onClick = { state = "idle" }) { Text("Riprova") }
+                    Text(tr("Non l'ho riconosciuto"), style = MaterialTheme.typography.titleMedium)
+                    Button(onClick = { state = "idle" }) { Text(tr("Riprova")) }
                 }
                 else -> {
                     Text(message, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
-                    Button(onClick = { state = "idle" }) { Text("Riprova") }
+                    Button(onClick = { state = "idle" }) { Text(tr("Riprova")) }
                 }
             }
         }

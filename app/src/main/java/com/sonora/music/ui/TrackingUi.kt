@@ -36,8 +36,8 @@ fun TrackingFlow(onDone: () -> Unit) {
         "tg" -> TelegramFlow(onDone, onBack = { method = null })
         "mail" -> EmailFlow(onDone, onBack = { method = null })
         else -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = { method = "tg" }, modifier = Modifier.fillMaxWidth()) { Text("Verifica con Telegram") }
-            FilledTonalButton(onClick = { method = "mail" }, modifier = Modifier.fillMaxWidth()) { Text("Verifica con email") }
+            Button(onClick = { method = "tg" }, modifier = Modifier.fillMaxWidth()) { Text(tr("Verifica con Telegram")) }
+            FilledTonalButton(onClick = { method = "mail" }, modifier = Modifier.fillMaxWidth()) { Text(tr("Verifica con email")) }
         }
     }
 }
@@ -71,10 +71,10 @@ private fun TelegramFlow(onDone: () -> Unit, onBack: () -> Unit) {
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             sid?.let { id ->
-                OutlinedButton(onClick = { uri.openUri("https://t.me/${Config.TELEGRAM_BOT}?start=$id") }) { Text("Riapri Telegram") }
+                OutlinedButton(onClick = { uri.openUri("https://t.me/${Config.TELEGRAM_BOT}?start=$id") }) { Text(tr("Riapri Telegram")) }
             }
-            if (error != null) OutlinedButton(onClick = { attempt++ }) { Text("Riprova") }
-            TextButton(onClick = onBack) { Text("Indietro") }
+            if (error != null) OutlinedButton(onClick = { attempt++ }) { Text(tr("Riprova")) }
+            TextButton(onClick = onBack) { Text(tr("Indietro")) }
         }
     }
 }
@@ -104,7 +104,7 @@ private fun EmailFlow(onDone: () -> Unit, onBack: () -> Unit) {
             OutlinedTextField(
                 value = code,
                 onValueChange = { code = it.filter(Char::isDigit).take(6) },
-                label = { Text("Codice a 6 cifre") },
+                label = { Text(tr("Codice a 6 cifre")) },
                 singleLine = true,
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                 modifier = Modifier.fillMaxWidth()
@@ -133,7 +133,7 @@ private fun EmailFlow(onDone: () -> Unit, onBack: () -> Unit) {
             },
             modifier = Modifier.fillMaxWidth()
         ) { Text(if (!sent) "Invia codice" else "Verifica") }
-        TextButton(onClick = onBack) { Text("Indietro") }
+        TextButton(onClick = onBack) { Text(tr("Indietro")) }
     }
 }
 
@@ -149,17 +149,17 @@ fun ConsentDialog(onClose: () -> Unit) {
         text = {
             if (step == 0) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Se accetti, Sonora salva sul nostro server i brani che ascolti (titolo, artista, orario, durata) per creare il tuo Wrapped di ogni anno.")
-                    Text("Per verificare che sei tu usiamo Telegram (numero di telefono) oppure l'email: vengono conservati solo come impronta (hash), mai in chiaro. Niente pubblicità, niente vendita dei dati. Puoi smettere e cancellare tutto quando vuoi dalle Impostazioni.")
-                    Text("Se rifiuti, nulla lascia il telefono: il Wrapped resta solo locale.")
-                    TextButton(onClick = { uri.openUri(Config.PRIVACY_URL) }) { Text("Leggi la privacy policy") }
+                    Text(tr("Se accetti, Sonora salva sul nostro server i brani che ascolti (titolo, artista, orario, durata) per creare il tuo Wrapped di ogni anno."))
+                    Text(tr("Per verificare che sei tu usiamo Telegram (numero di telefono) oppure l'email: vengono conservati solo come impronta (hash), mai in chiaro. Niente pubblicità, niente vendita dei dati. Puoi smettere e cancellare tutto quando vuoi dalle Impostazioni."))
+                    Text(tr("Se rifiuti, nulla lascia il telefono: il Wrapped resta solo locale."))
+                    TextButton(onClick = { uri.openUri(Config.PRIVACY_URL) }) { Text(tr("Leggi la privacy policy")) }
                 }
             } else {
                 TrackingFlow(onDone = onClose)
             }
         },
         confirmButton = {
-            if (step == 0) Button(onClick = { step = 1 }) { Text("Accetto") }
+            if (step == 0) Button(onClick = { step = 1 }) { Text(tr("Accetto")) }
         },
         dismissButton = {
             TextButton(onClick = {
@@ -195,7 +195,7 @@ fun TrackingSection(onWrapped: () -> Unit) {
             url = it
             Tracking.setServerUrl(context, it)
         },
-        label = { Text("Indirizzo server") },
+        label = { Text(tr("Indirizzo server")) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
     )
@@ -206,10 +206,10 @@ fun TrackingSection(onWrapped: () -> Unit) {
             enabled = Tracking.hasServer(context),
             onClick = { enabling = true },
             modifier = Modifier.fillMaxWidth()
-        ) { Text("Attiva il tracciamento") }
+        ) { Text(tr("Attiva il tracciamento")) }
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { Tracking.disable(context) }) { Text("Spegni") }
+            OutlinedButton(onClick = { Tracking.disable(context) }) { Text(tr("Spegni")) }
             OutlinedButton(onClick = {
                 scope.launch {
                     msg = try {
@@ -219,12 +219,12 @@ fun TrackingSection(onWrapped: () -> Unit) {
                         e.message ?: "Errore"
                     }
                 }
-            }) { Text("Elimina i miei dati") }
+            }) { Text(tr("Elimina i miei dati")) }
         }
     }
     msg?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = onWrapped) { Text("Apri Wrapped") }
-        TextButton(onClick = { uri.openUri(Config.PRIVACY_URL) }) { Text("Privacy") }
+        Button(onClick = onWrapped) { Text(tr("Apri Wrapped")) }
+        TextButton(onClick = { uri.openUri(Config.PRIVACY_URL) }) { Text(tr("Privacy")) }
     }
 }

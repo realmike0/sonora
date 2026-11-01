@@ -63,7 +63,7 @@ import java.io.File
 fun LyricShareButton(vm: PlayerViewModel, lyrics: Lyrics, modifier: Modifier = Modifier) {
     var open by remember { mutableStateOf(false) }
     IconButton(onClick = { open = true }, modifier = modifier) {
-        Icon(Icons.Rounded.Share, contentDescription = "Crea immagine dal testo", tint = androidx.compose.ui.graphics.Color.White)
+        Icon(Icons.Rounded.Share, contentDescription = tr("Crea immagine dal testo"), tint = androidx.compose.ui.graphics.Color.White)
     }
     if (open) LyricShareSheet(vm, lyrics) { open = false }
 }
@@ -78,7 +78,7 @@ private fun LyricShareSheet(vm: PlayerViewModel, lyrics: Lyrics, onDismiss: () -
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         androidx.compose.foundation.layout.Column(Modifier.navigationBarsPadding().padding(horizontal = 16.dp)) {
-            Text("Scegli fino a 8 righe", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 8.dp, bottom = 8.dp))
+            Text(tr("Scegli fino a 8 righe"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 8.dp, bottom = 8.dp))
             LazyColumn(Modifier.heightIn(max = 420.dp)) {
                 itemsIndexed(lyrics.lines) { i, line ->
                     Row(

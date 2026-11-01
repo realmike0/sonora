@@ -142,7 +142,7 @@ private fun DeviceCard(vm: PlayerViewModel, info: HeadsetInfo) {
                 }
             )
             TextButton(onClick = { vm.headsetDismissed = true }) {
-                Text("Non ora", color = Color.White.copy(alpha = 0.7f))
+                Text(tr("Non ora"), color = Color.White.copy(alpha = 0.7f))
             }
         }
     }

@@ -23,6 +23,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         Perf.init(this)
+        com.sonora.music.ui.Lang.load(this)
+        WrappedReminder.schedule(this)
         handleIntent(intent)
         Headsets.startService(this)
         setContent {
@@ -36,10 +38,12 @@ class MainActivity : ComponentActivity() {
     /** Scorciatoia del widget: apre direttamente la pagina dell'artista scelto. */
     private fun handleIntent(intent: Intent?) {
         intent?.getStringExtra(EXTRA_ARTIST)?.takeIf { it.isNotBlank() }?.let { vm.artistOpen = it }
+        if (intent?.getBooleanExtra(EXTRA_WRAPPED, false) == true) vm.wrappedOpen = true
     }
 
     companion object {
         const val EXTRA_ARTIST = "open_artist"
+        const val EXTRA_WRAPPED = "open_wrapped"
     }
 
     override fun onNewIntent(intent: Intent) {

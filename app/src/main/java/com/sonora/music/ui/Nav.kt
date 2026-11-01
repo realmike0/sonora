@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Search
@@ -42,6 +43,7 @@ private data class NavItem(val label: String, val icon: ImageVector)
 private val NAV_ITEMS = listOf(
     NavItem("Home", Icons.Rounded.Home),
     NavItem("Ricerca", Icons.Rounded.Search),
+    NavItem("Esplora", Icons.Rounded.Explore),
     NavItem("Raccolta", Icons.Rounded.LibraryMusic)
 )
 
@@ -111,7 +113,7 @@ private fun androidx.compose.foundation.layout.RowScope.NavPill(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(item.icon, contentDescription = item.label, tint = content, modifier = Modifier.size(26.dp))
+        Icon(item.icon, contentDescription = tr(item.label), tint = content, modifier = Modifier.size(26.dp))
         AnimatedVisibility(
             visible = selected,
             enter = expandHorizontally() + fadeIn(),
@@ -120,7 +122,7 @@ private fun androidx.compose.foundation.layout.RowScope.NavPill(
             Row {
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    item.label,
+                    tr(item.label),
                     color = content,
                     style = MaterialTheme.typography.labelLarge,
                     maxLines = 1

@@ -145,7 +145,7 @@ fun ArtistScreen(vm: PlayerViewModel, name: String, bottomPad: androidx.compose.
                     ) {
                         Text(s.msg, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(16.dp))
-                        FilledTonalButton(onClick = { attempt++ }) { Text("Riprova") }
+                        FilledTonalButton(onClick = { attempt++ }) { Text(tr("Riprova")) }
                     }
                 }
 
@@ -158,12 +158,12 @@ fun ArtistScreen(vm: PlayerViewModel, name: String, bottomPad: androidx.compose.
 @Composable
 private fun BackRow(onBack: () -> Unit) {
     IconButton(onClick = onBack, modifier = Modifier.padding(start = 8.dp, top = 4.dp)) {
-        Icon(Icons.Rounded.ArrowBack, contentDescription = "Indietro")
+        Icon(Icons.Rounded.ArrowBack, contentDescription = tr("Indietro"))
     }
 }
 
 /** Forma "biscotto" Material 3: cerchio con bordo ondulato. */
-private val CookieShape = object : androidx.compose.ui.graphics.Shape {
+internal val CookieShape = object : androidx.compose.ui.graphics.Shape {
     override fun createOutline(
         size: androidx.compose.ui.geometry.Size,
         layoutDirection: androidx.compose.ui.unit.LayoutDirection,
@@ -218,9 +218,9 @@ private fun ArtistContent(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    RoundBtn(onClose) { Icon(Icons.Rounded.ArrowBack, contentDescription = "Indietro") }
+                    RoundBtn(onClose) { Icon(Icons.Rounded.ArrowBack, contentDescription = tr("Indietro")) }
                     Spacer(Modifier.weight(1f))
-                    RoundBtn({ vm.settingsOpen = true }) { Icon(Icons.Rounded.Person, contentDescription = "Profilo") }
+                    RoundBtn({ vm.settingsOpen = true }) { Icon(Icons.Rounded.Person, contentDescription = tr("Profilo")) }
                 }
                 Box(Modifier.fillMaxWidth().padding(horizontal = 40.dp), contentAlignment = Alignment.Center) {
                     Artwork(page.image, Modifier.fillMaxWidth().aspectRatio(1f), CookieShape, px = 600)
@@ -247,7 +247,7 @@ private fun ArtistContent(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     RoundBtn({ if (songs.isNotEmpty()) vm.play(songs.shuffled(), 0) }, 60.dp) {
-                        Icon(Icons.Rounded.Shuffle, contentDescription = "Casuale")
+                        Icon(Icons.Rounded.Shuffle, contentDescription = tr("Casuale"))
                     }
                     Button(
                         onClick = { vm.play(songs, 0) },
@@ -257,17 +257,17 @@ private fun ArtistContent(
                     ) {
                         Icon(Icons.Rounded.PlayArrow, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("RIPRODUCI", fontWeight = FontWeight.ExtraBold)
+                        Text(tr("RIPRODUCI"), fontWeight = FontWeight.ExtraBold)
                     }
                     Box {
-                        RoundBtn({ menu = true }, 60.dp) { Icon(Icons.Rounded.MoreVert, contentDescription = "Opzioni") }
+                        RoundBtn({ menu = true }, 60.dp) { Icon(Icons.Rounded.MoreVert, contentDescription = tr("Opzioni")) }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(
-                                text = { Text("Aggiungi alla coda") },
+                                text = { Text(tr("Aggiungi alla coda")) },
                                 onClick = { songs.forEach { vm.addToQueue(it) }; menu = false }
                             )
                             DropdownMenuItem(
-                                text = { Text("Riproduci dopo") },
+                                text = { Text(tr("Riproduci dopo")) },
                                 onClick = { songs.reversed().forEach { vm.playNext(it) }; menu = false }
                             )
                         }
@@ -309,7 +309,7 @@ private fun ArtistContent(
                         )
                     }
                     IconButton(onClick = { vm.menuTrack = track }) {
-                        Icon(Icons.Rounded.MoreVert, contentDescription = "Altro")
+                        Icon(Icons.Rounded.MoreVert, contentDescription = tr("Altro"))
                     }
                 }
             }
@@ -410,7 +410,7 @@ private fun AlbumView(
                 ) {
                     Icon(Icons.Rounded.PlayArrow, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Riproduci")
+                    Text(tr("Riproduci"))
                 }
             }
         }
