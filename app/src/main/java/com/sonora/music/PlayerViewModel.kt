@@ -48,6 +48,8 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     var wrappedOpen by mutableStateOf(false)
     var queueOpen by mutableStateOf(false)
+    var videoOn by mutableStateOf(false)
+    var recognizeOpen by mutableStateOf(false)
 
     /** Coda di riproduzione. */
     var queue by mutableStateOf<List<Track>>(emptyList())
@@ -285,6 +287,28 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         queueIndex = p.currentMediaItemIndex
+    }
+
+    /** Interruttore audio ↔ video originale: ricarica la coda con il flusso video (o solo audio) dalla posizione attuale. */
+    fun setVideo(on: Boolean) {
+        val c = controller ?: return
+        VideoMode.on = on
+        videoOn = on
+        c.trackSelectionParameters = c.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_VIDEO, !on).build()
+        if (c.mediaItemCount == 0) return
+        val idx = c.currentMediaItemIndex
+        val pos = c.currentPosition
+        val playing = c.playWhenReady
+        val items = (0 until c.mediaItemCount).map { c.getMediaItemAt(it) }
+        c.setMediaItems(items, idx, pos)
+        c.prepare()
+        c.playWhenReady = playing
+    }
+
+    fun bindVideo(view: android.view.TextureView?) {
+        val c = controller ?: return
+        if (view != null) c.setVideoTextureView(view) else c.clearVideoSurface()
     }
 
     fun jumpTo(i: Int) {

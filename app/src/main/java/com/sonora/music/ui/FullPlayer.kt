@@ -23,6 +23,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -124,7 +125,7 @@ fun FullPlayer(vm: PlayerViewModel, onDismiss: () -> Unit, onArtist: (String) ->
             pendingArtist?.let(onArtist)
         }
     }
-    BackHandler(enabled = !closing) { closing = true }
+    val back = predictiveBack(enabled = !closing) { closing = true }
 
     val white = Color.White
     val soft = Color.White.copy(alpha = 0.72f)
@@ -134,6 +135,7 @@ fun FullPlayer(vm: PlayerViewModel, onDismiss: () -> Unit, onArtist: (String) ->
         BoxWithConstraints(
             Modifier
                 .fillMaxSize()
+                .backEffect(back)
                 .graphicsLayer { translationY = drag }
                 .pointerInput(Unit) {
                     detectVerticalDragGestures(
@@ -200,6 +202,11 @@ fun FullPlayer(vm: PlayerViewModel, onDismiss: () -> Unit, onArtist: (String) ->
                 ) { lyricsMode ->
                     Box(Modifier.fillMaxSize()) {
                         Artwork(np.artwork, Modifier.fillMaxSize(), RectangleShape, px = 1000)
+                        if (vm.videoOn && !lyricsMode) {
+                            Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+                                VideoSurface(vm, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+                            }
+                        }
                         if (lyricsMode) {
                             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)))
                             LyricsPanel(vm, Modifier.fillMaxSize().statusBarsPadding().padding(top = 56.dp))
@@ -335,6 +342,19 @@ fun FullPlayer(vm: PlayerViewModel, onDismiss: () -> Unit, onArtist: (String) ->
                         border = null
                     )
                     Spacer(Modifier.width(12.dp))
+                    FilterChip(
+                        selected = vm.videoOn,
+                        onClick = { vm.setVideo(!vm.videoOn) },
+                        label = { Text("Video") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = Color.White.copy(alpha = 0.12f),
+                            labelColor = white,
+                            selectedContainerColor = white,
+                            selectedLabelColor = Color.Black
+                        ),
+                        border = null
+                    )
+                    Spacer(Modifier.width(12.dp))
                     MorphIconButton(onClick = { addTrack = np.toTrack() }, size = 48.dp, container = Color.White.copy(alpha = 0.14f)) {
                         Icon(Icons.Rounded.Add, contentDescription = "Aggiungi a playlist")
                     }
@@ -451,5 +471,15 @@ fun MorphIconButton(
                 scaleY = scale
             },
         content = content
+    )
+}
+
+/** Superficie dove viene mostrato il video originale. */
+@Composable
+fun VideoSurface(vm: PlayerViewModel, modifier: Modifier) {
+    androidx.compose.ui.viewinterop.AndroidView(
+        factory = { ctx -> android.view.TextureView(ctx).also { vm.bindVideo(it) } },
+        modifier = modifier,
+        onRelease = { vm.bindVideo(null) }
     )
 }

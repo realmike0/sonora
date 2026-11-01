@@ -83,7 +83,8 @@ object AudioStore {
 
     private val keyFactory = androidx.media3.datasource.cache.CacheKeyFactory { spec -> keyOf(spec.uri) }
 
-    private fun keyOf(uri: Uri): String = uri.lastPathSegment ?: uri.toString()
+    private fun keyOf(uri: Uri): String =
+        (if (uri.scheme == VIDEO_SCHEME) "v_" else "") + (uri.lastPathSegment ?: uri.toString())
 
     @Synchronized
     fun init(context: Context) {
@@ -104,7 +105,17 @@ object AudioStore {
     private val upstream: DataSource.Factory by lazy {
         val http = OkHttpDataSource.Factory(Http.client).setUserAgent(USER_AGENT)
         ResolvingDataSource.Factory(http, ResolvingDataSource.Resolver { spec: DataSpec ->
-            if (spec.uri.scheme == TRACK_SCHEME) {
+            if (spec.uri.scheme == VIDEO_SCHEME) {
+                val id = spec.uri.lastPathSegment ?: throw IOException("ID brano mancante")
+                val url = try {
+                    MusicRepository.resolveVideoUrl(id)
+                } catch (e: IOException) {
+                    throw e
+                } catch (e: Exception) {
+                    throw IOException("Impossibile ottenere il video: ${e.message}", e)
+                }
+                spec.withUri(Uri.parse(url))
+            } else if (spec.uri.scheme == TRACK_SCHEME) {
                 val id = spec.uri.lastPathSegment ?: throw IOException("ID brano mancante")
                 val url = try {
                     MusicRepository.resolveAudioUrl(id)

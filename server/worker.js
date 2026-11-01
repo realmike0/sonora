@@ -1,4 +1,4 @@
-// Server Wrapped di Sonora (Cloudflare Worker + D1). Segreti: BREVO_KEY, SENDER_EMAIL, TELEGRAM_BOT_TOKEN.
+// Server Wrapped di Sonora (Cloudflare Worker + D1). Segreti: BREVO_KEY, SENDER_EMAIL, TELEGRAM_BOT_TOKEN, AUDD_TOKEN.
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json" } });
 const err = (m, s = 400) => J({ error: m }, s);
 
@@ -114,6 +114,25 @@ export default {
         if (req.headers.get("x-telegram-bot-api-secret-token") !== (await sha(env.TELEGRAM_BOT_TOKEN || "")).slice(0, 32)) return err("Non autorizzato", 401);
         await telegramUpdate(env, await req.json());
         return J({ ok: true });
+      }
+
+      if (req.method === "POST" && path === "/v1/recognize") {
+        if (!env.AUDD_TOKEN || env.AUDD_TOKEN === "none") return err("Riconoscimento non configurato", 503);
+        const ip = req.headers.get("cf-connecting-ip") || "x";
+        const day = Math.floor(Date.now() / 86400000);
+        const key = (await sha(ip)).slice(0, 24) + ":" + day;
+        const row = await env.DB.prepare("SELECT n FROM rl WHERE k=?").bind(key).first();
+        if (row && row.n >= 15) return err("Limite giornaliero raggiunto, riprova domani", 429);
+        await env.DB.prepare("INSERT INTO rl(k,n) VALUES(?,1) ON CONFLICT(k) DO UPDATE SET n=n+1").bind(key).run();
+        const buf = await req.arrayBuffer();
+        if (buf.byteLength < 1000 || buf.byteLength > 2000000) return err("Audio non valido");
+        const fd = new FormData();
+        fd.append("api_token", env.AUDD_TOKEN);
+        fd.append("file", new Blob([buf], { type: "audio/wav" }), "a.wav");
+        const r = await fetch("https://api.audd.io/", { method: "POST", body: fd });
+        const j = await r.json().catch(() => ({}));
+        if (j && j.result && j.result.title) return J({ found: true, title: j.result.title, artist: j.result.artist || "" });
+        return J({ found: false });
       }
 
       if (req.method === "POST" && path === "/v1/tg/start") {

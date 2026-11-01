@@ -64,7 +64,7 @@ private val PALETTES = listOf(
 
 @Composable
 fun WrappedScreen(vm: PlayerViewModel, onClose: () -> Unit) {
-    BackHandler(onBack = onClose)
+    val back = predictiveBack(onBack = onClose)
     val context = LocalContext.current
     val thisYear = LocalDate.now().year
     var year by remember { mutableStateOf(thisYear) }
@@ -88,7 +88,7 @@ fun WrappedScreen(vm: PlayerViewModel, onClose: () -> Unit) {
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Color(0xFF0E0E12))) {
+    Box(Modifier.backEffect(back).fillMaxSize().background(Color(0xFF0E0E12))) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, contentDescription = "Chiudi", tint = Color.White) }

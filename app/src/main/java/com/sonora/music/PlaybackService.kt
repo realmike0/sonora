@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -39,6 +40,14 @@ class PlaybackService : MediaSessionService() {
     private val handler = Handler(Looper.getMainLooper())
     private var fadeTick: Runnable? = null
 
+    // Dissolvenza vera: un secondo player "ombra" suona la coda del brano che esce mentre il principale parte con il successivo.
+    private var ghost: ExoPlayer? = null
+    private var ghostStart = 0L
+    private var ghostLen = 0L
+    private var ghostForId: String? = null
+
+    private fun playUri(id: String): Uri = if (VideoMode.on) trackVideoUri(id) else trackUri(id)
+
     override fun onCreate() {
         super.onCreate()
 
@@ -56,12 +65,27 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
+        // Il video resta spento finché non lo chiede l'utente (interruttore audio/video).
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true).build()
+
+        // Equalizzatore sulla sessione audio del player.
+        Eq.attach(this, player.audioSessionId)
+        player.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+            override fun onAudioSessionIdChanged(
+                eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                audioSessionId: Int
+            ) {
+                Eq.attach(this@PlaybackService, audioSessionId)
+            }
+        })
 
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 retriedId = null
-                // Salva il brano intero in cache mentre lo ascolti.
-                mediaItem?.let { AudioStore.fillCache(it.mediaId) }
+                if (mediaItem?.mediaId != ghostForId) ghostForId = null
+                // Salva il brano intero in cache mentre lo ascolti (non per il video).
+                if (!VideoMode.on) mediaItem?.let { AudioStore.fillCache(it.mediaId) }
             }
 
             override fun onPlayerError(error: PlaybackException) {
@@ -78,7 +102,7 @@ class PlaybackService : MediaSessionService() {
             }
         })
 
-        // Mixaggio fluido: il brano che finisce sfuma in uscita e il successivo sale in entrata.
+        // Mixaggio fluido: sovrapposizione vera (player ombra) oppure dissolvenza semplice del volume.
         val prefs = getSharedPreferences("sonora", MODE_PRIVATE)
         val tick = object : Runnable {
             override fun run() {
@@ -86,11 +110,43 @@ class PlaybackService : MediaSessionService() {
                     val outMs = prefs.getInt("fade_out_ms", 4000).toLong()
                     val inMs = prefs.getInt("fade_in_ms", 2500).toLong()
                     val curve = prefs.getInt("fade_curve", 0)
+                    val overlap = prefs.getBoolean("mix_overlap", true) && !Perf.lite.value
+                    val now = SystemClock.uptimeMillis()
+
+                    // 1) Il player ombra sfuma in uscita il brano precedente.
+                    ghost?.let { g ->
+                        if (!player.playWhenReady) {
+                            g.playWhenReady = false
+                            ghostStart += 100 // in pausa il tempo non scorre
+                        } else {
+                            g.playWhenReady = true
+                            val el = now - ghostStart
+                            if (el >= ghostLen + 200) {
+                                g.release()
+                                ghost = null
+                            } else {
+                                g.volume = shape(1f - el.toFloat() / ghostLen, curve)
+                            }
+                        }
+                    }
+
                     if (prefs.getBoolean("mix_fade", true) && player.playWhenReady) {
                         val dur = player.duration
                         val pos = player.currentPosition
                         var v = 1f
-                        if (dur != C.TIME_UNSET && dur > 30_000L) {
+                        if (overlap) {
+                            // 2) Quando mancano outMs alla fine, il successivo parte subito e sale mentre l'ombra scende.
+                            if (outMs > 0 && dur != C.TIME_UNSET && dur > 30_000L && player.hasNextMediaItem() &&
+                                player.repeatMode != Player.REPEAT_MODE_ONE
+                            ) {
+                                val rem = dur - pos
+                                val id = player.currentMediaItem?.mediaId
+                                if (rem in 700L..outMs && id != null && ghostForId != id) startGhost(player, rem)
+                            }
+                            if (ghost != null && ghostLen > 0) {
+                                v = shape((now - ghostStart).toFloat() / ghostLen, curve)
+                            }
+                        } else if (dur != C.TIME_UNSET && dur > 30_000L) {
                             if (outMs > 0 && player.hasNextMediaItem()) {
                                 val rem = dur - pos
                                 if (rem < outMs) v = minOf(v, shape(rem.toFloat() / outMs, curve))
@@ -129,7 +185,7 @@ class PlaybackService : MediaSessionService() {
                     mediaItems: List<MediaItem>
                 ): ListenableFuture<List<MediaItem>> {
                     val items = mediaItems.map {
-                        it.buildUpon().setUri(trackUri(it.mediaId)).build()
+                        it.buildUpon().setUri(playUri(it.mediaId)).build()
                     }
                     return Futures.immediateFuture(items)
                 }
@@ -149,7 +205,7 @@ class PlaybackService : MediaSessionService() {
         val tracks = Store(this).liked.toList().shuffled()
         if (tracks.isEmpty()) return
         player.setMediaItems(
-            tracks.map { it.toMediaItem().buildUpon().setUri(trackUri(it.id)).build() },
+            tracks.map { it.toMediaItem().buildUpon().setUri(playUri(it.id)).build() },
             0,
             0L
         )
@@ -167,6 +223,27 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    /** Fa partire il player ombra con il brano che sta finendo e porta subito il principale al successivo. */
+    private fun startGhost(player: ExoPlayer, remMs: Long) {
+        val item = player.currentMediaItem ?: return
+        val g = ghost ?: ExoPlayer.Builder(this)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(AudioStore.playbackFactory()))
+            .setAudioAttributes(
+                AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
+                /* handleAudioFocus = */ false
+            )
+            .build().also { ghost = it }
+        g.setMediaItem(item, player.currentPosition)
+        g.volume = 1f
+        g.prepare()
+        g.playWhenReady = true
+        ghostForId = item.mediaId
+        ghostStart = SystemClock.uptimeMillis()
+        ghostLen = remMs
+        player.volume = 0f
+        player.seekToNextMediaItem()
+    }
+
     /** Curva della dissolvenza: 0 = morbida, 1 = lineare, 2 = potenza costante (più "radiofonica"). */
     private fun shape(x: Float, curve: Int): Float {
         val t = x.coerceIn(0f, 1f)
@@ -179,6 +256,9 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         fadeTick?.let { handler.removeCallbacks(it) }
+        ghost?.release()
+        ghost = null
+        Eq.release()
         session?.run {
             player.release()
             release()

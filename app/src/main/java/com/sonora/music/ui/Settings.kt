@@ -115,6 +115,10 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
                 AudioQualitySection()
             }
 
+            SettingsCard("Equalizzatore") {
+                EqualizerSection()
+            }
+
             SettingsCard("Dissolvenza avanzata") {
                 FadeSection()
             }

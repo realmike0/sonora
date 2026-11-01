@@ -62,6 +62,7 @@ import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SkipNext
@@ -151,8 +152,10 @@ fun SonoraRoot(vm: PlayerViewModel) {
             enter = slideInVertically(spring(BOUNCY, Spring.StiffnessMediumLow)) { it / 3 } + fadeIn(),
             exit = slideOutVertically { it / 3 } + fadeOut()
         ) {
-            BackHandler { vm.settingsOpen = false }
-            SettingsScreen(vm, onClose = { vm.settingsOpen = false })
+            val back = predictiveBack { vm.settingsOpen = false }
+            Box(Modifier.backEffect(back)) {
+                SettingsScreen(vm, onClose = { vm.settingsOpen = false })
+            }
         }
 
         // Telefono in orizzontale: schermata stile AOD (luminosità ridotta, notifiche, brano).
@@ -270,6 +273,7 @@ fun SonoraScreen(vm: PlayerViewModel) {
     }
 
     if (vm.queueOpen) QueueSheet(vm, onDismiss = { vm.queueOpen = false })
+    if (vm.recognizeOpen) RecognizeSheet(vm, onDismiss = { vm.recognizeOpen = false })
 
     // Dispositivo audio collegato: modello 3D + "Inizia ad ascoltare".
     DeviceSheet(vm)
@@ -409,7 +413,13 @@ private fun SearchField(vm: PlayerViewModel) {
                     Icon(Icons.Rounded.Close, contentDescription = "Cancella")
                 }
             }
-        } else null,
+        } else {
+            {
+                IconButton(onClick = { vm.recognizeOpen = true }) {
+                    Icon(Icons.Rounded.Mic, contentDescription = "Riconosci brano")
+                }
+            }
+        },
         singleLine = true,
         shape = CircleShape,
         colors = TextFieldDefaults.colors(

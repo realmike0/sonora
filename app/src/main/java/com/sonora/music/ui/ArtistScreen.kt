@@ -114,13 +114,14 @@ fun ArtistScreen(vm: PlayerViewModel, name: String, bottomPad: androidx.compose.
         }
     }
 
-    BackHandler { if (album != null) album = null else onClose() }
+    val back = predictiveBack { if (album != null) album = null else onClose() }
 
     val accent = artistColor(name)
     val bg = MaterialTheme.colorScheme.background
 
     Box(
         Modifier
+            .backEffect(back)
             .fillMaxSize()
             .background(bg)
             .background(Brush.verticalGradient(listOf(accent.copy(alpha = 0.28f), Color.Transparent), endY = 1200f))

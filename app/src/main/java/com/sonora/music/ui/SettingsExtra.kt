@@ -75,6 +75,18 @@ fun FadeSection() {
         Switch(checked = on, onCheckedChange = { on = it; p.edit().putBoolean("mix_fade", it).apply() })
     }
     if (on) {
+        var overlap by remember { mutableStateOf(p.getBoolean("mix_overlap", true)) }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Sovrapposizione vera", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "I due brani suonano insieme (con la grafica leggera si usa la dissolvenza semplice).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(checked = overlap, onCheckedChange = { overlap = it; p.edit().putBoolean("mix_overlap", it).apply() })
+        }
         Text("Uscita: %.1f s".format(out), style = MaterialTheme.typography.labelMedium)
         Slider(value = out, onValueChange = { out = it }, valueRange = 0f..12f,
             onValueChangeFinished = { p.edit().putInt("fade_out_ms", (out * 1000).toInt()).apply() })
@@ -117,5 +129,43 @@ fun HapticsSection() {
             )
         }
         Switch(checked = on, onCheckedChange = { on = it; p.edit().putBoolean("haptics", it).apply() })
+    }
+}
+
+@Composable
+fun EqualizerSection() {
+    val c = LocalContext.current
+    val info = remember { com.sonora.music.Eq.info() }
+    if (info == null) {
+        Text("Avvia un brano per regolare l'equalizzatore (o il telefono non lo supporta).", style = MaterialTheme.typography.bodySmall)
+        return
+    }
+    var on by remember { mutableStateOf(com.sonora.music.Eq.enabled(c)) }
+    var levels by remember { mutableStateOf(com.sonora.music.Eq.levels(c).let { l -> List(info.bands) { l.getOrNull(it) ?: 0 } }) }
+    var bass by remember { mutableFloatStateOf(com.sonora.music.Eq.bass(c).toFloat()) }
+    var loud by remember { mutableFloatStateOf(com.sonora.music.Eq.loud(c).toFloat()) }
+    fun save() = com.sonora.music.Eq.save(c, on, levels, bass.toInt(), loud.toInt())
+
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text("Equalizzatore", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+        Switch(checked = on, onCheckedChange = { on = it; save() })
+    }
+    if (on) {
+        Chips(info.presets, -1) { i ->
+            com.sonora.music.Eq.presetLevels(i)?.let { levels = it; save() }
+        }
+        info.freqsHz.forEachIndexed { i, hz ->
+            Text(if (hz >= 1000) "${hz / 1000} kHz" else "$hz Hz", style = MaterialTheme.typography.labelMedium)
+            Slider(
+                value = levels[i].toFloat(),
+                onValueChange = { v -> levels = levels.toMutableList().also { it[i] = v.toInt() } },
+                valueRange = info.minMb.toFloat()..info.maxMb.toFloat(),
+                onValueChangeFinished = { save() }
+            )
+        }
+        Text("Bassi", style = MaterialTheme.typography.labelMedium)
+        Slider(value = bass, onValueChange = { bass = it }, valueRange = 0f..1000f, onValueChangeFinished = { save() })
+        Text("Volume extra", style = MaterialTheme.typography.labelMedium)
+        Slider(value = loud, onValueChange = { loud = it }, valueRange = 0f..1000f, onValueChangeFinished = { save() })
     }
 }

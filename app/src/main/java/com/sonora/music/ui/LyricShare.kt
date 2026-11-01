@@ -122,62 +122,104 @@ private fun LyricShareSheet(vm: PlayerViewModel, lyrics: Lyrics, onDismiss: () -
     }
 }
 
-/** Disegna l'immagine con Canvas: sfondo sfumato dal colore dell'artista, copertina, testo grande. */
+/** Immagine in stile YouTube Music / Spotify: scheda tinta sul colore della copertina, titolo, righe grandi e logo. */
 object LyricImage {
     private const val W = 1080
-    private const val H = 1350
+    private const val PAD = 56f
 
     fun create(context: Context, title: String, artist: String, coverUrl: String?, lyrics: String): android.net.Uri {
-        val bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
-        val c = Canvas(bmp)
-
-        val accent = artistColor(artist).toArgb()
-        val hsv = FloatArray(3)
-        android.graphics.Color.colorToHSV(accent, hsv)
-        val top = android.graphics.Color.HSVToColor(floatArrayOf(hsv[0], 0.65f, 0.55f))
-        val bottom = android.graphics.Color.HSVToColor(floatArrayOf(hsv[0], 0.7f, 0.14f))
-        val bg = Paint().apply { shader = LinearGradient(0f, 0f, 0f, H.toFloat(), top, bottom, Shader.TileMode.CLAMP) }
-        c.drawRect(0f, 0f, W.toFloat(), H.toFloat(), bg)
-
         val cover = coverUrl?.let { runCatching { download(it) }.getOrNull() }
-        val box = RectF(90f, 90f, 290f, 290f)
+
+        // Tinta dalla copertina (colore medio); se manca, dall'artista.
+        val base = cover?.let { averageColor(it) } ?: artistColor(artist).toArgb()
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(base, hsv)
+        val hue = hsv[0]
+        val bgColor = android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.6f, 0.24f))
+        val textColor = android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.28f, 0.96f))
+        val softColor = android.graphics.Color.HSVToColor(160, floatArrayOf(hue, 0.3f, 0.9f))
+        val lineColor = android.graphics.Color.HSVToColor(60, floatArrayOf(hue, 0.3f, 0.9f))
+
+        val lines = lyrics.split("\n").filter { it.isNotBlank() }
+        val textW = (W - 2 * PAD).toInt()
+        val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = textColor; typeface = Typeface.DEFAULT_BOLD }
+        var size = 66f
+        var layouts: List<StaticLayout>
+        while (true) {
+            paint.textSize = size
+            layouts = lines.map {
+                StaticLayout.Builder.obtain(it, 0, it.length, paint, textW)
+                    .setAlignment(Layout.Alignment.ALIGN_NORMAL).setLineSpacing(0f, 1.12f).build()
+            }
+            if (layouts.sumOf { it.height } + 34 * layouts.size <= 1300 || size <= 36f) break
+            size -= 4f
+        }
+        val gap = 34f
+        val coverSize = 180f
+        val headerBottom = PAD + coverSize
+        val textTop = headerBottom + 50f + 16f
+        val textHeight = layouts.sumOf { it.height }.toFloat() + gap * (layouts.size - 1)
+        val footerTop = textTop + textHeight + 56f
+        val height = (footerTop + 64f + PAD).toInt()
+
+        val bmp = Bitmap.createBitmap(W, height, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        val card = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bgColor }
+        c.drawRoundRect(RectF(0f, 0f, W.toFloat(), height.toFloat()), 48f, 48f, card)
+
+        val box = RectF(PAD, PAD, PAD + coverSize, PAD + coverSize)
         if (cover != null) {
-            val clip = Path().apply { addRoundRect(box, 36f, 36f, Path.Direction.CW) }
+            val clip = Path().apply { addRoundRect(box, 24f, 24f, Path.Direction.CW) }
             c.save()
             c.clipPath(clip)
             c.drawBitmap(cover, null, box, Paint(Paint.FILTER_BITMAP_FLAG))
             c.restore()
         }
 
-        val name = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; typeface = Typeface.DEFAULT_BOLD; textSize = 46f }
-        val sub = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xCCFFFFFF.toInt(); textSize = 36f }
-        c.drawText(ellipsize(title, name, 700f), 330f, 175f, name)
-        c.drawText(ellipsize(artist, sub, 700f), 330f, 230f, sub)
+        val name = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = textColor; typeface = Typeface.DEFAULT_BOLD; textSize = 44f }
+        val sub = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = softColor; textSize = 42f }
+        val tx = PAD + coverSize + 36f
+        c.drawText(ellipsize(title, name, W - tx - PAD), tx, PAD + 84f, name)
+        c.drawText(ellipsize(artist, sub, W - tx - PAD), tx, PAD + 142f, sub)
 
-        // Testo: si rimpicciolisce finché sta nello spazio disponibile.
-        val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; typeface = Typeface.DEFAULT_BOLD }
-        var size = 84f
-        var layout: StaticLayout
-        while (true) {
-            paint.textSize = size
-            layout = StaticLayout.Builder.obtain(lyrics, 0, lyrics.length, paint, 900)
-                .setAlignment(Layout.Alignment.ALIGN_NORMAL).setLineSpacing(0f, 1.15f).build()
-            if (layout.height <= 780 || size <= 34f) break
-            size -= 4f
+        val divider = Paint().apply { color = lineColor; strokeWidth = 3f }
+        c.drawLine(PAD, headerBottom + 50f, W - PAD, headerBottom + 50f, divider)
+
+        var y = textTop
+        layouts.forEach {
+            c.save()
+            c.translate(PAD, y)
+            it.draw(c)
+            c.restore()
+            y += it.height + gap
         }
-        c.save()
-        c.translate(90f, 380f + (780f - layout.height).coerceAtLeast(0f) / 2f)
-        layout.draw(c)
-        c.restore()
 
-        val mark = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x99FFFFFF.toInt(); textSize = 34f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC) }
-        c.drawText("Sonora", 90f, (H - 80).toFloat(), mark)
+        // Logo Sonora: cerchio con triangolo play + nome.
+        val cy = footerTop + 32f
+        val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = textColor; style = Paint.Style.STROKE; strokeWidth = 6f }
+        c.drawCircle(PAD + 32f, cy, 29f, ring)
+        val tri = Path().apply {
+            moveTo(PAD + 24f, cy - 15f); lineTo(PAD + 24f, cy + 15f); lineTo(PAD + 48f, cy); close()
+        }
+        c.drawPath(tri, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = textColor })
+        val mark = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = textColor; typeface = Typeface.DEFAULT_BOLD; textSize = 54f }
+        c.drawText("Sonora", PAD + 82f, cy + 19f, mark)
 
         val dir = File(context.cacheDir, "lyrics").apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
         val file = File(dir, "testo-${System.currentTimeMillis()}.png")
         file.outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    }
+
+    private fun averageColor(b: Bitmap): Int {
+        val s = Bitmap.createScaledBitmap(b, 16, 16, true)
+        var r = 0L; var g = 0L; var bl = 0L
+        for (x in 0 until 16) for (y in 0 until 16) {
+            val p = s.getPixel(x, y)
+            r += android.graphics.Color.red(p); g += android.graphics.Color.green(p); bl += android.graphics.Color.blue(p)
+        }
+        return android.graphics.Color.rgb((r / 256).toInt(), (g / 256).toInt(), (bl / 256).toInt())
     }
 
     private fun ellipsize(s: String, p: TextPaint, w: Float) =

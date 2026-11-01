@@ -38,6 +38,16 @@ fun Track.toMediaItem(): MediaItem =
         )
         .build()
 
+/** Modalità video originale: quando è attiva i brani si riproducono con il flusso video di YouTube. */
+object VideoMode {
+    @Volatile var on = false
+}
+
+const val VIDEO_SCHEME = "ytmv"
+
+fun trackVideoUri(videoId: String): Uri =
+    Uri.Builder().scheme(VIDEO_SCHEME).authority("track").appendPath(videoId).build()
+
 /** Informazioni extra sul brano, mostrate nel menu a tendina. */
 data class TrackDetails(val published: String?, val views: Long?)
 
@@ -129,8 +139,24 @@ object MusicRepository {
         return best.content
     }
 
+    private val videoCache = ConcurrentHashMap<String, Pair<String, Long>>()
+
+    /** URL del miglior flusso video con audio già insieme (progressivo, di solito 360p/720p). Chiamata bloccante. */
+    fun resolveVideoUrl(videoId: String): String {
+        val now = System.currentTimeMillis()
+        videoCache[videoId]?.let { (url, time) -> if (now - time < STREAM_TTL_MS) return url }
+        val info = StreamInfo.getInfo(ServiceList.YouTube, "https://www.youtube.com/watch?v=$videoId")
+        val best = info.videoStreams
+            .filter { it.isUrl && !it.isVideoOnly && it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP }
+            .maxByOrNull { it.height }
+            ?: throw IOException("Video non disponibile per questo brano")
+        videoCache[videoId] = best.content to now
+        return best.content
+    }
+
     fun invalidate(videoId: String) {
         streamCache.remove(videoId)
+        videoCache.remove(videoId)
     }
 
     internal fun StreamInfoItem.toTrack(): Track? {
