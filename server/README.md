@@ -4,3 +4,4 @@ Cloudflare Worker + database D1, usato solo da chi accetta il tracciamento. Senz
 
 Vedi [docs/PRIVACY.md](../docs/PRIVACY.md) per i dati trattati.
 
+
