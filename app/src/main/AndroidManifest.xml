@@ -45,17 +45,6 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Legge le notifiche in arrivo per mostrarle nella modalità AOD (serve il consenso dell'utente). -->
-        <service
-            android:name=".SonoraNotificationListener"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
-
         <!-- Tiene viva l'app per riconoscere cuffie/speaker/auto e mandare la notifica "Inizia ad ascoltare". -->
         <service
             android:name=".HeadsetService"

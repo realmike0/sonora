@@ -49,6 +49,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     var wrappedOpen by mutableStateOf(false)
     var queueOpen by mutableStateOf(false)
     var videoOn by mutableStateOf(false)
+    var shuffleOn by mutableStateOf(false)
     var recognizeOpen by mutableStateOf(false)
 
     /** Coda di riproduzione. */
@@ -133,6 +134,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
+            shuffleOn = player.shuffleModeEnabled
             sync(player)
             if (events.containsAny(Player.EVENT_TIMELINE_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION)) refreshQueue(player)
         }
@@ -389,6 +391,12 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun playFrom(index: Int) = play(results, index, fromSearch = true)
+
+    fun toggleShuffle() {
+        val c = controller ?: return
+        c.shuffleModeEnabled = !c.shuffleModeEnabled
+        shuffleOn = c.shuffleModeEnabled
+    }
 
     fun togglePlay() {
         val c = controller ?: return

@@ -205,17 +205,7 @@ fun AodScreen(vm: PlayerViewModel) {
                     )
                     Spacer(Modifier.height(8.dp))
                     if (!access) {
-                        Text(
-                            "Per vedere qui le notifiche serve il tuo consenso.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = soft
-                        )
-                        TextButton(onClick = {
-                            context.startActivity(
-                                Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            )
-                        }) { Text("Consenti accesso alle notifiche") }
+                        // Senza accesso alle notifiche (non richiesto dall'app) mostriamo solo data, ora e brano.
                     } else if (NotifHub.items.isEmpty()) {
                         Text("Nessuna notifica", style = MaterialTheme.typography.bodyMedium, color = soft)
                     } else {

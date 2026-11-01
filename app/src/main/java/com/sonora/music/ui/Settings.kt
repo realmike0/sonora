@@ -311,18 +311,11 @@ private fun NotificationAccessSection() {
         }
     }
     Text(
-        "Ruotando il telefono in orizzontale Sonora mostra data, ora, notifiche e il brano, con luminosità ridotta.",
+        "Ruotando il telefono in orizzontale Sonora mostra data, ora e il brano, con luminosità ridotta.",
         style = MaterialTheme.typography.bodyMedium
     )
     if (access) {
         Text("Accesso alle notifiche attivo", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-    } else {
-        Button(onClick = {
-            context.startActivity(
-                android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-        }) { Text("Consenti accesso alle notifiche") }
     }
 }
 
