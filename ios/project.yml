@@ -1,0 +1,22 @@
+name: Sonora
+options:
+  bundleIdPrefix: com.sonora
+  deploymentTarget:
+    iOS: "15.0"
+targets:
+  Sonora:
+    type: application
+    platform: iOS
+    sources: [Sonora]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sonora.music
+        MARKETING_VERSION: "0.50"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Sonora
+        INFOPLIST_KEY_UIBackgroundModes: audio
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"

@@ -23,6 +23,9 @@ class SonoraApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         AudioStore.init(this)
+        AudioPrefs.load(this)
+        PlayLog.init(this)
+        Tracking.init(this)
         NewPipe.init(
             YtDownloader(Http.client),
             Localization("it", "IT"),

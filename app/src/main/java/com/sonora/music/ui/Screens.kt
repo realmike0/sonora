@@ -117,6 +117,7 @@ import androidx.core.content.ContextCompat
 import com.sonora.music.Headsets
 import com.sonora.music.PlayerViewModel
 import com.sonora.music.Track
+import com.sonora.music.Tracking
 import com.sonora.music.toTrack
 import kotlin.math.PI
 import kotlin.math.sin
@@ -169,6 +170,12 @@ fun SonoraRoot(vm: PlayerViewModel) {
                 onClose = { vm.loginOpen = false }
             )
         }
+
+        if (vm.store.onboarded && !splash && Tracking.state == "unset" && Tracking.hasServer(androidx.compose.ui.platform.LocalContext.current)) {
+            ConsentDialog(onClose = {})
+        }
+
+        if (vm.wrappedOpen) WrappedScreen(vm, onClose = { vm.wrappedOpen = false })
 
         SplashOverlay(visible = splash)
     }
@@ -261,6 +268,8 @@ fun SonoraScreen(vm: PlayerViewModel) {
             )
         }
     }
+
+    if (vm.queueOpen) QueueSheet(vm, onDismiss = { vm.queueOpen = false })
 
     // Dispositivo audio collegato: modello 3D + "Inizia ad ascoltare".
     DeviceSheet(vm)
@@ -485,7 +494,7 @@ private fun WavyProgress(progress: () -> Float, playing: Boolean, modifier: Modi
 
     val phase = remember { androidx.compose.animation.core.Animatable(0f) }
     androidx.compose.runtime.LaunchedEffect(playing) {
-        if (playing) {
+        if (playing && !com.sonora.music.Perf.lite.value) {
             while (true) {
                 phase.animateTo(
                     phase.value + (2 * PI).toFloat(),

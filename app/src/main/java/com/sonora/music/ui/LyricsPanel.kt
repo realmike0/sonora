@@ -121,7 +121,7 @@ private fun LyricLineItem(text: String, active: Boolean, distance: Int, onClick:
                 transformOrigin = TransformOrigin(0f, 0.5f)
             }
             // Solo la riga attuale è nitida: sopra e sotto il testo si sfoca sempre di più.
-            .then(if (!active && distance > 0) Modifier.blur((distance * 1.6f).coerceAtMost(7f).dp) else Modifier)
+            .then(if (!active && distance > 0) Modifier.softBlur((distance * 1.6f).coerceAtMost(7f).dp) else Modifier)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     )
 }

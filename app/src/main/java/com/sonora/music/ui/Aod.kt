@@ -103,7 +103,7 @@ fun isLandscape(): Boolean =
 private fun BlurBackdrop(art: String?, dim: Float) {
     Box(Modifier.fillMaxSize()) {
         if (art != null) {
-            Artwork(art, Modifier.fillMaxSize().blur(50.dp), RectangleShape, px = 160)
+            Artwork(art, Modifier.fillMaxSize().softBlur(50.dp), RectangleShape, px = 160)
         }
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = dim)))
     }
@@ -334,9 +334,10 @@ private val NEON = intArrayOf(
 /** Glow neon circolare attorno al rettangolo: strati sempre più larghi e trasparenti attorno a un filo luminoso. */
 private fun Modifier.neonGlow(): Modifier = composed {
     val transition = rememberInfiniteTransition(label = "neon")
+    val lite = com.sonora.music.Perf.lite.value
     val angle = transition.animateFloat(
         initialValue = 0f,
-        targetValue = 360f,
+        targetValue = if (lite) 0f else 360f,
         animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing)),
         label = "neonAngle"
     )

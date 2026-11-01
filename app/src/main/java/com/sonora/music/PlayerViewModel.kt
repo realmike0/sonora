@@ -46,6 +46,17 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     /** Artista aperto nella sua pagina (null = nessuna). */
     var artistOpen by mutableStateOf<String?>(null)
 
+    var wrappedOpen by mutableStateOf(false)
+    var queueOpen by mutableStateOf(false)
+
+    /** Coda di riproduzione. */
+    var queue by mutableStateOf<List<Track>>(emptyList())
+        private set
+    var queueIndex by mutableStateOf(0)
+        private set
+
+    private var maxPos = 0L
+
     /** Brano di cui è aperto il menu (pressione prolungata). */
     var menuTrack by mutableStateOf<Track?>(null)
 
@@ -119,7 +130,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private var searchJob: Job? = null
 
     private val listener = object : Player.Listener {
-        override fun onEvents(player: Player, events: Player.Events) = sync(player)
+        override fun onEvents(player: Player, events: Player.Events) {
+            sync(player)
+            if (events.containsAny(Player.EVENT_TIMELINE_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION)) refreshQueue(player)
+        }
     }
 
     init {
@@ -131,6 +145,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             controller = c
             c.addListener(listener)
             sync(c)
+            refreshQueue(c)
         }, ContextCompat.getMainExecutor(context))
 
         home = HomeRepository.loadCached(app.filesDir)
@@ -142,7 +157,12 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             while (true) {
                 delay(250)
-                controller?.let { if (it.isPlaying) positionMs = it.currentPosition }
+                controller?.let {
+                    if (it.isPlaying) {
+                        positionMs = it.currentPosition
+                        if (positionMs > maxPos) maxPos = positionMs
+                    }
+                }
             }
         }
     }
@@ -228,15 +248,66 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         if (np?.id != nowPlaying?.id && np != null) {
+            nowPlaying?.let { logPlay(it) }
+            maxPos = 0L
             val track = np.toTrack()
             store.recordPlayed(track)
             if (queueFromSearch) store.recordSearchPlay(track)
         }
+        val changedNow = np?.id != nowPlaying?.id || wantsPlay != lastWidgetPlaying
         nowPlaying = np
+        if (changedNow) {
+            lastWidgetPlaying = wantsPlay
+            Widgets.setNow(getApplication(), np?.title, np?.artist, wantsPlay)
+        }
         if (np?.id != lyricsFor) {
             lyricsFor = np?.id
             loadLyrics(np)
         }
+    }
+
+    private var lastWidgetPlaying = false
+
+    /** Registra l'ascolto (almeno 15 secondi, o metà del brano). */
+    private fun logPlay(np: NowPlaying) {
+        val dur = np.durationSec * 1000
+        if (maxPos >= 15_000L || (dur > 0 && maxPos >= dur / 2)) {
+            PlayLog.add(PlayEvent(System.currentTimeMillis(), np.id, np.title, np.artist, np.artwork, maxPos))
+        }
+    }
+
+    private fun refreshQueue(p: Player) {
+        queue = (0 until p.mediaItemCount).map {
+            val m = p.getMediaItemAt(it)
+            Track(
+                m.mediaId, m.mediaMetadata.title?.toString().orEmpty(), m.mediaMetadata.artist?.toString().orEmpty(),
+                m.mediaMetadata.artworkUri?.toString(), (m.mediaMetadata.durationMs ?: 0L) / 1000
+            )
+        }
+        queueIndex = p.currentMediaItemIndex
+    }
+
+    fun jumpTo(i: Int) {
+        controller?.let { it.seekTo(i, 0L); it.play() }
+    }
+
+    fun removeFromQueue(i: Int) {
+        controller?.removeMediaItem(i)
+    }
+
+    fun moveInQueue(from: Int, to: Int) {
+        controller?.moveMediaItem(from, to)
+    }
+
+    /** "Riproduci dopo": subito dopo il brano attuale. */
+    fun playNext(track: Track) {
+        val c = controller ?: return
+        if (c.mediaItemCount == 0) play(listOf(track), 0) else c.addMediaItem(c.currentMediaItemIndex + 1, track.toMediaItem())
+    }
+
+    fun addToQueue(track: Track) {
+        val c = controller ?: return
+        if (c.mediaItemCount == 0) play(listOf(track), 0) else c.addMediaItem(track.toMediaItem())
     }
 
     private fun loadLyrics(np: NowPlaying?) {

@@ -25,7 +25,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -155,6 +161,41 @@ private fun BackRow(onBack: () -> Unit) {
     }
 }
 
+/** Forma "biscotto" Material 3: cerchio con bordo ondulato. */
+private val CookieShape = object : androidx.compose.ui.graphics.Shape {
+    override fun createOutline(
+        size: androidx.compose.ui.geometry.Size,
+        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+        density: androidx.compose.ui.unit.Density
+    ): androidx.compose.ui.graphics.Outline {
+        val path = androidx.compose.ui.graphics.Path()
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val r = minOf(cx, cy) / 1.06f
+        val n = 9
+        val steps = 180
+        for (i in 0..steps) {
+            val t = (i.toFloat() / steps) * 2f * Math.PI.toFloat()
+            val rr = r * (1f + 0.06f * kotlin.math.cos(n * t))
+            val x = cx + rr * kotlin.math.cos(t)
+            val y = cy + rr * kotlin.math.sin(t)
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        path.close()
+        return androidx.compose.ui.graphics.Outline.Generic(path)
+    }
+}
+
+@Composable
+private fun RoundBtn(onClick: () -> Unit, size: androidx.compose.ui.unit.Dp = 48.dp, content: @Composable () -> Unit) {
+    Box(
+        Modifier.size(size).clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) { content() }
+}
+
 @Composable
 private fun ArtistContent(
     vm: PlayerViewModel,
@@ -165,45 +206,71 @@ private fun ArtistContent(
     onAlbum: (AlbumItem) -> Unit
 ) {
     val songs = page.songs.take(10)
+    var menu by remember { mutableStateOf(false) }
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = bottomPad + 16.dp)
     ) {
         item(key = "head") {
-            Column(Modifier.statusBarsPadding()) {
-                BackRow(onClose)
+            Column(Modifier.statusBarsPadding().fillMaxWidth()) {
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        page.name,
-                        style = TextStyle(
-                            fontFamily = artistFont(page.name),
-                            fontWeight = FontWeight.Normal,
-                            fontSize = nameSize(page.name),
-                            lineHeight = nameSize(page.name) * 0.98f,
-                            color = accent
-                        ),
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (page.image != null) {
-                        Spacer(Modifier.width(12.dp))
-                        Artwork(page.image, Modifier.size(72.dp), CircleShape, px = 256)
-                    }
+                    RoundBtn(onClose) { Icon(Icons.Rounded.ArrowBack, contentDescription = "Indietro") }
+                    Spacer(Modifier.weight(1f))
+                    RoundBtn({ vm.settingsOpen = true }) { Icon(Icons.Rounded.Person, contentDescription = "Profilo") }
                 }
+                Box(Modifier.fillMaxWidth().padding(horizontal = 40.dp), contentAlignment = Alignment.Center) {
+                    Artwork(page.image, Modifier.fillMaxWidth().aspectRatio(1f), CookieShape, px = 600)
+                }
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    page.name,
+                    style = TextStyle(
+                        fontFamily = artistFont(page.name),
+                        fontWeight = FontWeight.Normal,
+                        fontSize = nameSize(page.name),
+                        lineHeight = nameSize(page.name) * 0.98f,
+                        color = accent,
+                        textAlign = TextAlign.Center
+                    ),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+                )
                 Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = { vm.play(songs, 0) },
-                    enabled = songs.isNotEmpty(),
-                    colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.Black),
-                    modifier = Modifier.padding(horizontal = 24.dp)
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Riproduci")
+                    RoundBtn({ if (songs.isNotEmpty()) vm.play(songs.shuffled(), 0) }, 60.dp) {
+                        Icon(Icons.Rounded.Shuffle, contentDescription = "Casuale")
+                    }
+                    Button(
+                        onClick = { vm.play(songs, 0) },
+                        enabled = songs.isNotEmpty(),
+                        colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.Black),
+                        modifier = Modifier.weight(1f).height(60.dp)
+                    ) {
+                        Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("RIPRODUCI", fontWeight = FontWeight.ExtraBold)
+                    }
+                    Box {
+                        RoundBtn({ menu = true }, 60.dp) { Icon(Icons.Rounded.MoreVert, contentDescription = "Opzioni") }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Aggiungi alla coda") },
+                                onClick = { songs.forEach { vm.addToQueue(it) }; menu = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Riproduci dopo") },
+                                onClick = { songs.reversed().forEach { vm.playNext(it) }; menu = false }
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.height(8.dp))
             }
@@ -212,14 +279,38 @@ private fun ArtistContent(
         if (songs.isNotEmpty()) {
             item(key = "songs-title") { SectionTitle("Brani popolari") }
             itemsIndexed(songs, key = { _, t -> "s-" + t.id }) { index, track ->
-                TrackRow(
-                    track = track,
-                    selected = vm.nowPlaying?.id == track.id,
-                    liked = vm.store.isLiked(track.id),
-                    onClick = { vm.play(songs, index) },
-                    onLike = { vm.store.toggleLike(track) },
-                    onMore = { vm.menuTrack = track }
-                )
+                val top = if (index == 0) 28.dp else 6.dp
+                val bottom = if (index == songs.lastIndex) 28.dp else 6.dp
+                val playing = vm.nowPlaying?.id == track.id
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 1.5.dp)
+                        .clip(RoundedCornerShape(top, top, bottom, bottom))
+                        .background(
+                            if (playing) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceContainerHigh
+                        )
+                        .clickable { vm.play(songs, index) }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Artwork(track.thumb, Modifier.size(52.dp), RoundedCornerShape(14.dp), px = 160)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(track.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            track.artist,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    IconButton(onClick = { vm.menuTrack = track }) {
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "Altro")
+                    }
+                }
             }
         }
 

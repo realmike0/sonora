@@ -19,22 +19,14 @@ import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import com.sonora.music.R
 
-/** Outfit (Google Fonts, licenza OFL): font variabile, quindi ogni peso è nitido. */
+/** Google Sans Flex (Google Fonts, licenza OFL), in tutta l'app tranne le pagine degli artisti. */
 val Outfit = FontFamily(
-    listOf(
-        FontWeight.Light to 300,
-        FontWeight.Normal to 400,
-        FontWeight.Medium to 500,
-        FontWeight.SemiBold to 600,
-        FontWeight.Bold to 700,
-        FontWeight.ExtraBold to 800
-    ).map { (weight, value) ->
-        Font(
-            resId = R.font.outfit,
-            weight = weight,
-            variationSettings = FontVariation.Settings(FontVariation.weight(value))
-        )
-    }
+    Font(R.font.gsf_light, FontWeight.Light),
+    Font(R.font.gsf_regular, FontWeight.Normal),
+    Font(R.font.gsf_medium, FontWeight.Medium),
+    Font(R.font.gsf_semibold, FontWeight.SemiBold),
+    Font(R.font.gsf_bold, FontWeight.Bold),
+    Font(R.font.gsf_extrabold, FontWeight.ExtraBold)
 )
 
 private fun TextStyle.outfit() = copy(fontFamily = Outfit)
@@ -73,7 +65,13 @@ fun SonoraTheme(content: @Composable () -> Unit) {
 
     MaterialTheme(
         colorScheme = colors,
-        typography = SonoraTypography,
-        content = content
-    )
+        typography = SonoraTypography
+    ) {
+        // Superficie di base: il colore del testo segue sempre lo sfondo (nero su chiaro, bianco su scuro).
+        androidx.compose.material3.Surface(
+            color = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.onBackground,
+            content = content
+        )
+    }
 }

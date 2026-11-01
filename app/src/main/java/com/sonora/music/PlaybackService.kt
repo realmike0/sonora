@@ -83,16 +83,19 @@ class PlaybackService : MediaSessionService() {
         val tick = object : Runnable {
             override fun run() {
                 try {
+                    val outMs = prefs.getInt("fade_out_ms", 4000).toLong()
+                    val inMs = prefs.getInt("fade_in_ms", 2500).toLong()
+                    val curve = prefs.getInt("fade_curve", 0)
                     if (prefs.getBoolean("mix_fade", true) && player.playWhenReady) {
                         val dur = player.duration
                         val pos = player.currentPosition
                         var v = 1f
                         if (dur != C.TIME_UNSET && dur > 30_000L) {
-                            if (player.hasNextMediaItem()) {
+                            if (outMs > 0 && player.hasNextMediaItem()) {
                                 val rem = dur - pos
-                                if (rem < FADE_OUT_MS) v = minOf(v, smooth(rem.toFloat() / FADE_OUT_MS))
+                                if (rem < outMs) v = minOf(v, shape(rem.toFloat() / outMs, curve))
                             }
-                            if (pos < FADE_IN_MS) v = minOf(v, smooth(pos.toFloat() / FADE_IN_MS))
+                            if (inMs > 0 && pos < inMs) v = minOf(v, shape(pos.toFloat() / inMs, curve))
                         }
                         player.volume = v
                     } else if (player.volume != 1f) {
@@ -101,7 +104,7 @@ class PlaybackService : MediaSessionService() {
                 } catch (e: Exception) {
                     // best-effort
                 }
-                handler.postDelayed(this, 120)
+                handler.postDelayed(this, 100)
             }
         }
         fadeTick = tick
@@ -164,9 +167,14 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
-    private fun smooth(x: Float): Float {
+    /** Curva della dissolvenza: 0 = morbida, 1 = lineare, 2 = potenza costante (più "radiofonica"). */
+    private fun shape(x: Float, curve: Int): Float {
         val t = x.coerceIn(0f, 1f)
-        return t * t * (3f - 2f * t)
+        return when (curve) {
+            1 -> t
+            2 -> kotlin.math.sin(t * Math.PI.toFloat() / 2f)
+            else -> t * t * (3f - 2f * t)
+        }
     }
 
     override fun onDestroy() {

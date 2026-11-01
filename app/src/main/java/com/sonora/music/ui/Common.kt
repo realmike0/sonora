@@ -60,6 +60,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -426,3 +427,7 @@ private fun PlaylistChoice(title: String, subtitle: String?, onClick: () -> Unit
         }
     }
 }
+
+/** Sfocatura che si spegne sui dispositivi poco potenti (sfondo semplice al suo posto). */
+fun androidx.compose.ui.Modifier.softBlur(radius: androidx.compose.ui.unit.Dp): androidx.compose.ui.Modifier =
+    if (com.sonora.music.Perf.lite.value) this else this.blur(radius)

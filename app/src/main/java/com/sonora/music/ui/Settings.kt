@@ -107,8 +107,20 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
                 LyricsSourcePicker(store)
             }
 
-            SettingsCard("Riproduzione") {
-                MixSwitch()
+            SettingsCard("Wrapped e tracciamento") {
+                TrackingSection(onWrapped = { vm.wrappedOpen = true; vm.settingsOpen = false })
+            }
+
+            SettingsCard("Qualità audio") {
+                AudioQualitySection()
+            }
+
+            SettingsCard("Dissolvenza avanzata") {
+                FadeSection()
+            }
+
+            SettingsCard("Prestazioni grafiche") {
+                PerfSection()
             }
 
             SettingsCard("Sempre attiva") {

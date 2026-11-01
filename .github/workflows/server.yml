@@ -1,0 +1,39 @@
+name: Server Wrapped
+on:
+  push:
+    paths: ["server/**"]
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ vars.DEPLOY_SERVER == 'true' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: server
+          command: d1 execute sonora_wrapped --remote --file=schema.sql
+      - id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: server
+          command: deploy
+          secrets: |
+            BREVO_KEY
+            SENDER_EMAIL
+            TELEGRAM_BOT_TOKEN
+        env:
+          BREVO_KEY: ${{ secrets.BREVO_KEY }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      - name: Collega il bot Telegram
+        env:
+          URL: ${{ steps.deploy.outputs.deployment-url }}
+          TG: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          echo "Server: $URL"
+          curl -fsS -X POST "$URL/setup" -H "Authorization: Bearer $TG"

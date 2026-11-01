@@ -41,6 +41,25 @@ fun Track.toMediaItem(): MediaItem =
 /** Informazioni extra sul brano, mostrate nel menu a tendina. */
 data class TrackDetails(val published: String?, val views: Long?)
 
+/** Formato e livello di qualità scelti dall'utente (YouTube offre solo M4A/AAC e WebM/Opus). */
+object AudioPrefs {
+    @Volatile var codec = "m4a"      // "m4a" | "webm"
+    @Volatile var level = "high"     // "high" | "medium" | "low"
+
+    fun load(c: android.content.Context) {
+        val p = c.getSharedPreferences("sonora", android.content.Context.MODE_PRIVATE)
+        codec = p.getString("aq_codec", "m4a") ?: "m4a"
+        level = p.getString("aq_level", "high") ?: "high"
+    }
+
+    fun save(c: android.content.Context, codec: String, level: String) {
+        this.codec = codec
+        this.level = level
+        c.getSharedPreferences("sonora", android.content.Context.MODE_PRIVATE)
+            .edit().putString("aq_codec", codec).putString("aq_level", level).apply()
+    }
+}
+
 object MusicRepository {
 
     private val detailsCache = ConcurrentHashMap<String, TrackDetails>()
@@ -96,11 +115,14 @@ object MusicRepository {
             ServiceList.YouTube,
             "https://www.youtube.com/watch?v=$videoId"
         )
-        val candidates = info.audioStreams.filter { it.isUrl }
-        val best = candidates
-            .filter { it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP }
-            .maxByOrNull { it.averageBitrate }
-            ?: candidates.firstOrNull()
+        val candidates = info.audioStreams.filter { it.isUrl && it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP }
+        val wanted = candidates.filter { it.format?.suffix == AudioPrefs.codec }.ifEmpty { candidates }
+        val sorted = wanted.sortedBy { it.averageBitrate }
+        val best = when (AudioPrefs.level) {
+            "low" -> sorted.firstOrNull()
+            "medium" -> sorted.getOrNull(sorted.size / 2)
+            else -> sorted.lastOrNull()
+        } ?: info.audioStreams.firstOrNull { it.isUrl }
             ?: throw IOException("Nessuno stream audio disponibile")
 
         streamCache[videoId] = best.content to now

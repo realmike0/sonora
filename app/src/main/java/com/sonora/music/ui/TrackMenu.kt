@@ -21,6 +21,8 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.PlaylistAdd
+import androidx.compose.material.icons.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -130,6 +132,16 @@ fun TrackMenuSheet(vm: PlayerViewModel, track: Track, onDismiss: () -> Unit) {
             }
 
             MenuAction(Icons.Rounded.PlaylistAdd, "Aggiungi alla playlist") { addingToPlaylist = true }
+
+            MenuAction(Icons.Rounded.SkipNext, "Riproduci dopo") {
+                vm.playNext(track)
+                onDismiss()
+            }
+
+            MenuAction(Icons.Rounded.QueueMusic, "Aggiungi alla coda") {
+                vm.addToQueue(track)
+                onDismiss()
+            }
 
             when {
                 downloaded -> MenuAction(Icons.Rounded.Delete, "Rimuovi dai download") {

@@ -6,7 +6,7 @@
 Ascolta in background, salva i brani offline, leggi i testi sincronizzati.
 
 ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
-![Versione](https://img.shields.io/badge/versione-0.41.2--beta-6750A4)
+![Versione](https://img.shields.io/badge/versione-0.51--beta-6750A4)
 ![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
 
 [⬇️ **Scarica l'APK**](https://github.com/realmike0/sonora/releases) · [💬 **Canale Telegram**](https://t.me/sonoraclient)
@@ -19,7 +19,7 @@ Ascolta in background, salva i brani offline, leggi i testi sincronizzati.
 
 Sonora è un'app Android per ascoltare musica da YouTube Music **con i colori del tuo telefono**: l'interfaccia segue Material You e si adatta allo sfondo che hai scelto. La musica continua anche con lo schermo spento o l'app in background, con i controlli nella notifica e nella schermata di blocco.
 
-È un progetto indipendente, nato in Italia e portato avanti da **realmike0**, ed è in **beta**: arrivano aggiornamenti spesso.
+È un progetto indipendente, nato e portato avanti da **realmike0**, ed è in **beta**: arrivano aggiornamenti spesso.
 
 ## 🚀 Cosa puoi fare
 
@@ -39,6 +39,16 @@ Sonora è un'app Android per ascoltare musica da YouTube Music **con i colori de
 - 📱 **Tablet** in orizzontale: interfaccia a due pannelli. **Telefono** in orizzontale: modalità AOD con ora, notifiche e brano.
 - ℹ️ **Menu del brano** (pressione prolungata): durata, data di pubblicazione, aggiungi ai preferiti o a una playlist, scarica.
 
+## 🆕 Novità della 0.50
+
+- **Wrapped** di ogni anno (locale, oppure con server se accetti il tracciamento) · coda di riproduzione · pillola del volume con riconoscimento del dispositivo (cuffie, speaker, auto) e vibrazione leggera
+- **Widget**: ascolti e in riproduzione, attività recente, scorciatoia all'artista che scegli
+- Qualità audio (M4A/WebM × alta/media/bassa) · dissolvenza avanzata · pagina artista ridisegnata · grafica leggera automatica sui dispositivi datati
+
+## 🔒 Privacy e Wrapped
+
+Il tracciamento è **facoltativo**: dopo l'onboarding ti viene chiesto e se rifiuti nulla lascia il telefono. Se accetti, verifichi chi sei con Telegram (numero) o con un codice via email e solo da quel momento i tuoi ascolti vanno al server per il Wrapped. Puoi spegnere o cancellare tutto dalle Impostazioni. Dettagli in [docs/PRIVACY.md](docs/PRIVACY.md); guida al server in [server/README.md](server/README.md).
+
 ## 📲 Come installarla
 
 1. Vai alla pagina delle [**Release**](https://github.com/realmike0/sonora/releases) e scarica l'ultimo file `.apk`.
@@ -46,6 +56,8 @@ Sonora è un'app Android per ascoltare musica da YouTube Music **con i colori de
 2. Aprilo dal telefono. Se Android lo chiede, consenti l'installazione da questa fonte.
 3. Alla prima apertura scrivi il tuo nome e scegli se collegare l'account Google.
 4. Su Android 13+ accetta le notifiche, servono per i controlli di riproduzione.
+
+**iOS (sperimentale):** il codice è in `ios/`. La build produce un IPA non firmato (Actions → *Build iOS IPA*) da installare con AltStore o Sideloadly. Su iOS 26+ l'interfaccia usa Liquid Glass; sulle versioni precedenti l'interfaccia standard.
 
 **Requisiti:** Android 8.0 (API 26) o successivo.
 

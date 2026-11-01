@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Sonora</string>
+    <string name="widget_now_desc">Brano in riproduzione e ultimi ascoltati</string>
+    <string name="widget_recent_desc">Attività recente</string>
+    <string name="widget_artist_desc">Scorciatoia al canale di un artista</string>
 </resources>

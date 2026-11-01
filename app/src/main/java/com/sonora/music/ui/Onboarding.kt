@@ -77,7 +77,7 @@ fun AuroraBackground(modifier: Modifier = Modifier) {
     )
 
     Box(modifier.fillMaxSize().background(lerp(scheme.primary, Color.Black, 0.72f))) {
-        Canvas(Modifier.fillMaxSize().blur(48.dp)) {
+        Canvas(Modifier.fillMaxSize().softBlur(48.dp)) {
             val w = size.width
             val h = size.height
 

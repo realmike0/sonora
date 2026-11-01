@@ -44,6 +44,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
@@ -169,7 +170,7 @@ fun FullPlayer(vm: PlayerViewModel, onDismiss: () -> Unit, onArtist: (String) ->
                     .fillMaxSize()
                     .graphicsLayer { alpha = progress.value.coerceIn(0f, 1f) }
             ) {
-                Artwork(np.artwork, Modifier.fillMaxSize().blur(60.dp), RectangleShape, px = 160)
+                Artwork(np.artwork, Modifier.fillMaxSize().softBlur(60.dp), RectangleShape, px = 160)
                 Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.62f)))
             }
 
@@ -337,7 +338,13 @@ fun FullPlayer(vm: PlayerViewModel, onDismiss: () -> Unit, onArtist: (String) ->
                     MorphIconButton(onClick = { addTrack = np.toTrack() }, size = 48.dp, container = Color.White.copy(alpha = 0.14f)) {
                         Icon(Icons.Rounded.Add, contentDescription = "Aggiungi a playlist")
                     }
+                    Spacer(Modifier.width(12.dp))
+                    MorphIconButton(onClick = { vm.queueOpen = true }, size = 48.dp, container = Color.White.copy(alpha = 0.14f)) {
+                        Icon(Icons.Rounded.QueueMusic, contentDescription = "Coda")
+                    }
                 }
+
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { VolumePill() }
             }
         }
     }

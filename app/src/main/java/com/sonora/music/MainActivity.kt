@@ -19,6 +19,8 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        Perf.init(this)
+        handleIntent(intent)
         Headsets.startService(this)
         setContent {
             SonoraTheme {
@@ -28,8 +30,18 @@ class MainActivity : ComponentActivity() {
     }
 
     // Se l'app viene riaperta da fuori (notifica, controlli multimediali) il player a tendina resta chiuso.
+    /** Scorciatoia del widget: apre direttamente la pagina dell'artista scelto. */
+    private fun handleIntent(intent: Intent?) {
+        intent?.getStringExtra(EXTRA_ARTIST)?.takeIf { it.isNotBlank() }?.let { vm.artistOpen = it }
+    }
+
+    companion object {
+        const val EXTRA_ARTIST = "open_artist"
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        handleIntent(intent)
         vm.playerOpen = false
     }
 
