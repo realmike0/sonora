@@ -36,4 +36,4 @@ jobs:
           TG: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
           echo "Server: $URL"
-          curl -fsS -X POST "$URL/setup" -H "Authorization: Bearer $TG"
+          curl -fsS --retry 10 --retry-delay 15 --retry-all-errors -X POST "$URL/setup" -H "Authorization: Bearer $TG"

@@ -4,6 +4,7 @@ package com.sonora.music.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -91,9 +92,15 @@ fun WrappedScreen(vm: PlayerViewModel, onClose: () -> Unit) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, contentDescription = "Chiudi", tint = Color.White) }
-                Spacer(Modifier.weight(1f))
-                for (y in thisYear downTo thisYear - 2) {
-                    FilterChip(selected = y == year, onClick = { year = y }, label = { Text("$y") }, modifier = Modifier.padding(end = 6.dp))
+                // Un anno in più ogni 1 gennaio: da quello del primo ascolto fino a quello in corso.
+                val first = remember(stats) {
+                    PlayLog.all().minOfOrNull { java.time.Instant.ofEpochMilli(it.ts).atZone(java.time.ZoneId.systemDefault()).year }
+                        ?.coerceAtMost(thisYear) ?: thisYear
+                }
+                Row(Modifier.weight(1f).horizontalScroll(androidx.compose.foundation.rememberScrollState(), reverseScrolling = true), horizontalArrangement = Arrangement.End) {
+                    for (y in first..thisYear) {
+                        FilterChip(selected = y == year, onClick = { year = y }, label = { Text("$y") }, modifier = Modifier.padding(end = 6.dp))
+                    }
                 }
             }
             val s = stats

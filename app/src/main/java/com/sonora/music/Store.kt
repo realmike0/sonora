@@ -62,7 +62,9 @@ class Store(context: Context) {
         private set
     var googleCookie by mutableStateOf(prefs.getString("cookie", null))
         private set
-    var lyricsSource by mutableStateOf(prefs.getString("lyrics_source", "LRCLIB") ?: "LRCLIB")
+    var lyricsSource by mutableStateOf(
+        if (prefs.getBoolean("lyrics_v2", false)) prefs.getString("lyrics_source", "Auto") ?: "Auto" else "Auto"
+    )
         private set
 
     var hasSearched by mutableStateOf(prefs.getBoolean("searched", false))
@@ -102,7 +104,7 @@ class Store(context: Context) {
 
     fun updateLyricsSource(source: String) {
         lyricsSource = source
-        prefs.edit().putString("lyrics_source", source).apply()
+        prefs.edit().putString("lyrics_source", source).putBoolean("lyrics_v2", true).apply()
     }
 
     fun markSearched() {

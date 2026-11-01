@@ -119,8 +119,9 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
                 FadeSection()
             }
 
-            SettingsCard("Prestazioni grafiche") {
+            SettingsCard("Prestazioni e tocco") {
                 PerfSection()
+                HapticsSection()
             }
 
             SettingsCard("Sempre attiva") {
@@ -356,7 +357,7 @@ private fun LyricsSourcePicker(store: Store) {
         }
     }
     Text(
-        "Per ora è disponibile solo LRCLIB.",
+        "Auto prova tutte le fonti insieme e sceglie il testo migliore: sincronizzato, con la durata giusta e dalla fonte più affidabile.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )

@@ -6,7 +6,7 @@
 Ascolta in background, salva i brani offline, leggi i testi sincronizzati.
 
 ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
-![Versione](https://img.shields.io/badge/versione-0.51--beta-6750A4)
+![Versione](https://img.shields.io/badge/versione-0.52--beta-6750A4)
 ![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
 
 [⬇️ **Scarica l'APK**](https://github.com/realmike0/sonora/releases) · [💬 **Canale Telegram**](https://t.me/sonoraclient)
@@ -44,6 +44,8 @@ Sonora è un'app Android per ascoltare musica da YouTube Music **con i colori de
 - **Wrapped** di ogni anno (locale, oppure con server se accetti il tracciamento) · coda di riproduzione · pillola del volume con riconoscimento del dispositivo (cuffie, speaker, auto) e vibrazione leggera
 - **Widget**: ascolti e in riproduzione, attività recente, scorciatoia all'artista che scegli
 - Qualità audio (M4A/WebM × alta/media/bassa) · dissolvenza avanzata · pagina artista ridisegnata · grafica leggera automatica sui dispositivi datati
+
+- **Testi da 5 fonti** (LRCLIB, BetterLyrics, Unison, LyricsPlus, KuGou) con scelta automatica del testo migliore · **immagine dai testi** da condividere · feedback aptico al tocco · Wrapped di tutti gli anni
 
 ## 🔒 Privacy e Wrapped
 

@@ -101,3 +101,21 @@ fun PerfSection() {
         modifier = Modifier.padding(top = 2.dp)
     )
 }
+
+@Composable
+fun HapticsSection() {
+    val c = LocalContext.current
+    val p = remember { prefs(c) }
+    var on by remember { mutableStateOf(p.getBoolean("haptics", true)) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Feedback aptico al tocco", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Una vibrazione leggerissima quando tocchi qualcosa.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(checked = on, onCheckedChange = { on = it; p.edit().putBoolean("haptics", it).apply() })
+    }
+}

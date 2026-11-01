@@ -61,7 +61,10 @@ fun LyricsPanel(vm: PlayerViewModel, modifier: Modifier = Modifier) {
                 )
             }
 
-            else -> LyricsList(vm, lyrics)
+            else -> Box(Modifier.fillMaxSize()) {
+                LyricsList(vm, lyrics)
+                LyricShareButton(vm, lyrics, Modifier.align(Alignment.BottomEnd).padding(8.dp))
+            }
         }
     }
 }

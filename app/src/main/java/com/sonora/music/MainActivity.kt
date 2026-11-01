@@ -2,6 +2,9 @@ package com.sonora.music
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
+import android.view.ViewConfiguration
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -43,6 +46,29 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         handleIntent(intent)
         vm.playerOpen = false
+    }
+
+    private var downX = 0f
+    private var downY = 0f
+    private var downT = 0L
+
+    /** Vibrazione leggerissima a ogni tocco breve (non allo scorrimento). Si può spegnere in Impostazioni. */
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downX = ev.x; downY = ev.y; downT = ev.eventTime
+            }
+            MotionEvent.ACTION_UP -> {
+                val slop = ViewConfiguration.get(this).scaledTouchSlop
+                if (ev.eventTime - downT < 250 &&
+                    kotlin.math.abs(ev.x - downX) < slop && kotlin.math.abs(ev.y - downY) < slop &&
+                    getSharedPreferences("sonora", MODE_PRIVATE).getBoolean("haptics", true)
+                ) {
+                    window.decorView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev)
     }
 
     override fun onStart() {
