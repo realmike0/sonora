@@ -142,6 +142,7 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
 
             SettingsCard(tr("Tocco")) {
                 HapticsSection()
+                AudioHapticsSection()
             }
 
             SettingsCard(tr("Sempre attiva")) {

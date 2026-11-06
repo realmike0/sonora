@@ -63,6 +63,8 @@
             </intent-filter>
         </receiver>
 
+        <receiver android:name=".WidgetActionReceiver" android:exported="false" />
+
         <receiver android:name=".NowWidget" android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

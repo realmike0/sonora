@@ -36,3 +36,6 @@ I dati restano finché non li elimini. Comunicazione in HTTPS; codici validi 10 
 
 ## Contatti
 Apri una issue sul repository GitHub di Sonora.
+
+## Dediche
+Se pubblichi una dedica, il brano, il destinatario, il messaggio e il nome che scegli sono visibili a tutti gli utenti con un Sonora ID. Puoi eliminarla in qualsiasi momento; le dediche segnalate da 3 utenti vengono nascoste e quelle di un account eliminato vengono cancellate.

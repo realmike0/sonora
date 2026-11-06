@@ -62,6 +62,7 @@ import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
@@ -275,6 +276,8 @@ fun SonoraScreen(vm: PlayerViewModel) {
 
     if (vm.queueOpen) QueueSheet(vm, onDismiss = { vm.queueOpen = false })
     if (vm.commentsOpen) CommentsSheet(vm, onDismiss = { vm.commentsOpen = false })
+    if (vm.dedOpen) DedicationsSheet(vm, onDismiss = { vm.dedOpen = false })
+    vm.dedicateTrack?.let { DedicateSheet(vm, it, onDismiss = { vm.dedicateTrack = null }) }
     if (vm.recognizeOpen) RecognizeSheet(vm, onDismiss = { vm.recognizeOpen = false })
 
     // Dispositivo audio collegato: modello 3D + "Inizia ad ascoltare".
@@ -395,6 +398,17 @@ private fun TrackList(vm: PlayerViewModel, tracks: List<Track>, fromSearch: Bool
 @Composable
 private fun SearchField(vm: PlayerViewModel) {
     val keyboard = LocalSoftwareKeyboardController.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // Ricerca vocale con il riconoscimento vocale di Google.
+    val speech = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { r ->
+        val text = r.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (r.resultCode == android.app.Activity.RESULT_OK && !text.isNullOrBlank()) {
+            vm.query = text
+            vm.search()
+        }
+    }
     TextField(
         value = vm.query,
         onValueChange = { vm.query = it },
@@ -408,8 +422,23 @@ private fun SearchField(vm: PlayerViewModel) {
             }
         } else {
             {
-                IconButton(onClick = { vm.recognizeOpen = true }) {
-                    Icon(Icons.Rounded.Mic, contentDescription = tr("Riconosci brano"))
+                Row {
+                    IconButton(onClick = {
+                        val i = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, Lang.effective())
+                            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, tr("Cerca brani, artisti…"))
+                        try {
+                            speech.launch(i)
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, tr("Ricerca vocale non disponibile"), android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }) {
+                        Icon(Icons.Rounded.Mic, contentDescription = tr("Ricerca vocale"))
+                    }
+                    IconButton(onClick = { vm.recognizeOpen = true }) {
+                        Icon(Icons.Rounded.GraphicEq, contentDescription = tr("Riconosci brano"))
+                    }
                 }
             }
         },

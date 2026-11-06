@@ -147,6 +147,12 @@ fun VolumePill(modifier: Modifier = Modifier) {
                     }
                 )
                 Spacer(Modifier.height(4.dp))
+                // Cambia dispositivo di uscita: cuffie e altoparlanti Bluetooth, Chromecast e altri trovati dal sistema.
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                androidx.compose.material3.TextButton(onClick = {
+                    open = false
+                    openOutputSwitcher(ctx)
+                }) { Text(tr("Altri dispositivi…")) }
             }
         }
     }
@@ -213,3 +219,20 @@ private fun PillSlider(value: Int, max: Int, onChange: (Int) -> Unit) {
 
 private fun Modifier.androidx_onSize(f: (Int) -> Unit): Modifier =
     this.onSizeChanged { f(it.width) }
+
+/** Apre il selettore di uscita del sistema (Bluetooth, Cast...). Se il telefono non lo ha, apre le impostazioni Bluetooth. */
+fun openOutputSwitcher(c: android.content.Context) {
+    val attempts = listOf(
+        android.content.Intent("com.android.settings.panel.action.MEDIA_OUTPUT")
+            .putExtra("com.android.settings.panel.extra.PACKAGE_NAME", c.packageName),
+        android.content.Intent(android.provider.Settings.Panel.ACTION_VOLUME),
+        android.content.Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)
+    )
+    for (i in attempts) {
+        try {
+            c.startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        } catch (e: Exception) {
+        }
+    }
+}

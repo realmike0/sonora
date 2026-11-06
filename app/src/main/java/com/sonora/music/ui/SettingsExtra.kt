@@ -121,6 +121,33 @@ fun HapticsSection() {
     }
 }
 
+/** Haptics audio: il telefono vibra a tempo con i bassi. Il permesso si chiede quando si accende. */
+@Composable
+fun AudioHapticsSection() {
+    val c = LocalContext.current
+    var on by remember { mutableStateOf(com.sonora.music.AudioHaptics.enabled(c)) }
+    val ask = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { ok ->
+        on = ok
+        com.sonora.music.AudioHaptics.setEnabled(c, ok)
+    }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(tr("Haptics audio"), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+        Switch(checked = on, onCheckedChange = { want ->
+            if (!want) {
+                on = false
+                com.sonora.music.AudioHaptics.setEnabled(c, false)
+            } else if (c.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                on = true
+                com.sonora.music.AudioHaptics.setEnabled(c, true)
+            } else {
+                ask.launch(android.Manifest.permission.RECORD_AUDIO)
+            }
+        })
+    }
+}
+
 @Composable
 fun EqualizerSection() {
     val c = LocalContext.current

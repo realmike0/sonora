@@ -51,6 +51,8 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     var videoOn by mutableStateOf(false)
     var shuffleOn by mutableStateOf(false)
     var commentsOpen by mutableStateOf(false)
+    var dedOpen by mutableStateOf(false)
+    var dedicateTrack by mutableStateOf<Track?>(null)
     var translateOn by mutableStateOf(false)
     var translation by mutableStateOf<List<String>?>(null)
     var translating by mutableStateOf(false)
@@ -268,7 +270,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         nowPlaying = np
         if (changedNow) {
             lastWidgetPlaying = wantsPlay
-            Widgets.setNow(getApplication(), np?.title, np?.artist, wantsPlay)
+            Widgets.setNow(getApplication(), np?.title, np?.artist, wantsPlay, np?.artwork)
         }
         if (np?.id != lyricsFor) {
             lyricsFor = np?.id
@@ -420,6 +422,40 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 translateFailed = result == null
             }
             translating = false
+        }
+    }
+
+    var mixing by mutableStateOf(false)
+    var mixError by mutableStateOf<String?>(null)
+
+    /** "Mix AI": riordina i brani che seguono quello in corso per un flusso fluido e accende la sovrapposizione. */
+    fun aiMixQueue() {
+        val c = controller ?: return
+        val cur = c.currentMediaItemIndex
+        val upcoming = queue.drop(cur + 1)
+        if (upcoming.size < 3 || mixing) return
+        mixing = true
+        mixError = null
+        viewModelScope.launch {
+            try {
+                val order = Ai.mixOrder(getApplication(), upcoming)
+                // Realizza la nuova sequenza con spostamenti, un brano alla volta.
+                order.forEachIndexed { pos, srcIdx ->
+                    val currentPositions = (0 until upcoming.size).toMutableList()
+                    // calcola dove si trova ora il brano "srcIdx" tenendo conto degli spostamenti già fatti
+                    val placed = order.take(pos).toSet()
+                    val remaining = (0 until upcoming.size).filter { it !in placed }
+                    val from = cur + 1 + pos + remaining.indexOf(srcIdx)
+                    val to = cur + 1 + pos
+                    if (from != to) c.moveMediaItem(from, to)
+                }
+                getApplication<Application>().getSharedPreferences("sonora", android.content.Context.MODE_PRIVATE)
+                    .edit().putBoolean("mix_overlap", true).apply()
+            } catch (e: Exception) {
+                mixError = e.message ?: "Mix non riuscito"
+            } finally {
+                mixing = false
+            }
         }
     }
 

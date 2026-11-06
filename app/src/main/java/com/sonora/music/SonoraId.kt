@@ -121,4 +121,35 @@ object SonoraId {
             syncing = false
         }
     }
+
+    // ---- Dediche ----
+    data class Dedication(
+        val id: String, val from: String, val to: String, val msg: String,
+        val track: Track, val mine: Boolean
+    )
+
+    suspend fun dedications(c: Context): List<Dedication> {
+        val r = call(c, "GET", "/v1/id/ded", null, auth = true)
+        val a = r.optJSONArray("items") ?: JSONArray()
+        return (0 until a.length()).map { i ->
+            val o = a.getJSONObject(i)
+            Dedication(
+                o.optString("id"), o.optString("from"), o.optString("to"), o.optString("msg"),
+                Track(o.optString("track"), o.optString("title"), o.optString("artist"), o.optString("thumb").ifEmpty { null }, 0L),
+                o.optBoolean("mine")
+            )
+        }
+    }
+
+    suspend fun dedicate(c: Context, t: Track, to: String, msg: String, from: String) {
+        call(
+            c, "POST", "/v1/id/ded",
+            JSONObject().put("track", t.id).put("title", t.title).put("artist", t.artist)
+                .put("thumb", t.thumb ?: "").put("to", to).put("msg", msg).put("from", from),
+            auth = true
+        )
+    }
+
+    suspend fun reportDedication(c: Context, id: String) { call(c, "POST", "/v1/id/ded/$id/report", JSONObject(), auth = true) }
+    suspend fun deleteDedication(c: Context, id: String) { call(c, "DELETE", "/v1/id/ded/$id", null, auth = true) }
 }

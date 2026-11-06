@@ -6,7 +6,7 @@
 Ascolta in background, salva i brani offline, leggi i testi sincronizzati.
 
 ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
-![Versione](https://img.shields.io/badge/versione-0.71--beta-6750A4)
+![Versione](https://img.shields.io/badge/versione-0.80--beta-6750A4)
 ![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
 
 [⬇️ **Scarica l'APK**](https://github.com/realmike0/sonora/releases) · [💬 **Canale Telegram**](https://t.me/sonoraclient)
@@ -51,6 +51,7 @@ Sonora è un'app Android per ascoltare musica da YouTube Music **con i colori de
 - **0.60.1:** nuovo player a schermo intero (barra a onda, controlli a pillola, casuale) · schermata testi con controlli animati · rimosso l'accesso alle notifiche (blocco Play Protect)
 - **0.60.2:** impostazioni più pulite (profilo con account Google, niente descrizioni) · Wrapped visibile a dicembre · APK firmato come release
 - **0.70:** Esplora (statistiche settimanali) · generi con playlist nella ricerca · playlist in stile album · lingue Italiano/English/Español/Deutsch · traduzione dei testi · notifica del Wrapped il 10 dicembre
+- **0.80:** AI (voto ad artisti e album, scelte del giorno, mix della coda) · ricerca vocale · francese, turco, albanese · widget rinnovati · haptics audio · cambio dispositivo di uscita · dediche con il cuore · Sonora Web, player indipendente nella cartella web/ (anche per Android < 8)
 - **0.71:** stili grafici (Material 3 Expressive, Material You, Liquid Glass, Miuix) · Sonora ID (email e password, preferiti sincronizzati) · commenti di YouTube Music · pagine playlist in stile artista · menu a pressione lunga in Raccolta
 
 ## 🔒 Privacy e Wrapped

@@ -74,7 +74,8 @@ fun HomeScreen(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit.Dp, modi
             contentPadding = PaddingValues(bottom = bottomPad + 16.dp)
         ) {
             item(key = "picks-title") {
-                Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp)) {
+                Row(Modifier.padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
                     if (vm.store.userName.isNotBlank()) {
                         Text(
                             "Ciao, ${vm.store.userName}",
@@ -86,6 +87,8 @@ fun HomeScreen(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit.Dp, modi
                         tr("Scelte del giorno"),
                         style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
                     )
+                }
+                DedicationHeart(onClick = { vm.dedOpen = true })
                 }
             }
 
@@ -103,6 +106,10 @@ fun HomeScreen(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit.Dp, modi
                     Spacer(Modifier.width(8.dp))
                     Text(tr("Riproduci le scelte"))
                 }
+            }
+
+            if (vm.store.played.size >= 5) {
+                item(key = "ai-picks") { AiPicksShelf(vm) }
             }
 
             if (recent.isNotEmpty()) {
@@ -241,5 +248,19 @@ private fun ShelfCard(track: Track, onClick: () -> Unit, onLong: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 2.dp)
         )
+    }
+}
+
+/** "Scelti per te dall'AI": una volta al giorno, in base agli ascolti recenti. */
+@Composable
+private fun AiPicksShelf(vm: PlayerViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var picks by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<List<Track>?>(null) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        picks = runCatching { com.sonora.music.Ai.dailyPicks(context, vm.store.played.take(40)) }.getOrDefault(emptyList())
+    }
+    val list = picks
+    if (list != null && list.isNotEmpty()) {
+        ShelfRow(vm, Shelf(tr("Scelti per te dall'AI"), list))
     }
 }
