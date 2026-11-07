@@ -66,7 +66,9 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
 
     val typography = MaterialTheme.typography
     // Schermata sempre scura con i colori dinamici del telefono: testo chiaro e leggibile.
-    val scheme = remember(AppStyle.id) { styleScheme(context, dark = true) }
+    val scheme = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) dynamicDarkColorScheme(context) else darkColorScheme()
+    }
 
     MaterialTheme(colorScheme = scheme, typography = typography) {
     Surface(
@@ -102,11 +104,6 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
                     )
                 }
                 GoogleSection(vm)
-                SonoraIdSection(vm)
-            }
-
-            SettingsCard(tr("Stile")) {
-                StyleSection()
             }
 
             SettingsCard(tr("Lingua")) {
@@ -142,7 +139,6 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
 
             SettingsCard(tr("Tocco")) {
                 HapticsSection()
-                AudioHapticsSection()
             }
 
             SettingsCard(tr("Sempre attiva")) {
@@ -186,9 +182,8 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
 @Composable
 private fun SettingsCard(title: String, content: @Composable ColumnScope.() -> Unit) {
     Surface(
-        shape = RoundedCornerShape(AppStyle.card),
-        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = AppStyle.cardAlpha),
-        border = if (AppStyle.id == StyleId.GLASS) androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.16f)) else null,
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -289,22 +284,6 @@ private fun UpdateSection(vm: PlayerViewModel, version: String) {
                 prefs.edit().putBoolean("auto_update_check", it).apply()
             }
         )
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun StyleSection() {
-    val context = LocalContext.current
-    val suggested = remember { AppStyle.suggested() }
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        StyleId.values().forEach { st ->
-            FilterChip(
-                selected = AppStyle.id == st,
-                onClick = { AppStyle.set(context, st) },
-                label = { Text(st.label + if (st == suggested) " ★" else "") }
-            )
-        }
     }
 }
 

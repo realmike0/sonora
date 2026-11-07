@@ -42,7 +42,6 @@ import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -298,9 +297,6 @@ fun FullPlayer(vm: PlayerViewModel, onDismiss: () -> Unit, onArtist: (String) ->
                                     )
                                     Icon(Icons.Rounded.ChevronRight, null, tint = soft, modifier = Modifier.size(20.dp))
                                 }
-                            }
-                            androidx.compose.material3.IconButton(onClick = { vm.commentsOpen = true }) {
-                                Icon(Icons.Rounded.ChatBubbleOutline, contentDescription = tr("Commenti"), tint = white)
                             }
                             LikeButton(liked = vm.store.isLiked(np.id), onClick = { vm.store.toggleLike(np.toTrack()) }, tint = white)
                         }

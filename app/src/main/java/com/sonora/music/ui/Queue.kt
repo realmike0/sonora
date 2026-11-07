@@ -42,16 +42,6 @@ fun QueueSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                 modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
             )
-            if (vm.queue.size - vm.queueIndex > 3) {
-                androidx.compose.material3.FilledTonalButton(
-                    onClick = { vm.aiMixQueue() },
-                    enabled = !vm.mixing,
-                    modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
-                ) { Text(tr(if (vm.mixing) "L'AI sta mixando…" else "Mix AI")) }
-                vm.mixError?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 8.dp, bottom = 8.dp))
-                }
-            }
             if (vm.queue.isEmpty()) {
                 Text(tr("Niente in coda"), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(8.dp))
             }

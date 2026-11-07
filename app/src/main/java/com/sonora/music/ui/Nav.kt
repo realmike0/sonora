@@ -12,7 +12,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -54,18 +53,11 @@ private val NAV_ITEMS = listOf(
  */
 @Composable
 fun FloatingNavBar(selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
-    when (AppStyle.id) {
-        StyleId.YOU -> { FlatNavBar(selected, onSelect, indicator = true, modifier = modifier); return }
-        StyleId.MIUIX -> { FlatNavBar(selected, onSelect, indicator = false, modifier = modifier); return }
-        else -> Unit
-    }
-    val glass = AppStyle.id == StyleId.GLASS
     Surface(
         shape = RoundedCornerShape(36.dp),
-        color = if (glass) MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f) else MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = if (glass) 0.dp else 3.dp,
-        shadowElevation = if (glass) 0.dp else 10.dp,
-        border = if (glass) androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.22f)) else null,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 3.dp,
+        shadowElevation = 10.dp,
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp)
@@ -95,7 +87,7 @@ private fun androidx.compose.foundation.layout.RowScope.NavPill(
 ) {
     val weight by animateFloatAsState(
         targetValue = if (selected) 1.9f else 1f,
-        animationSpec = spring(if (AppStyle.bouncy) Spring.DampingRatioMediumBouncy else Spring.DampingRatioNoBouncy, Spring.StiffnessMediumLow),
+        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
         label = "navWeight"
     )
     val container by animateColorAsState(
@@ -135,45 +127,6 @@ private fun androidx.compose.foundation.layout.RowScope.NavPill(
                     style = MaterialTheme.typography.labelLarge,
                     maxLines = 1
                 )
-            }
-        }
-    }
-}
-
-/** Barra a tutta larghezza: icona sopra e nome sotto. Con "indicator" la voce scelta ha la pillola (Material You); senza è solo colorata (Miuix). */
-@Composable
-private fun FlatNavBar(selected: Int, onSelect: (Int) -> Unit, indicator: Boolean, modifier: Modifier = Modifier) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Row(Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {
-            NAV_ITEMS.forEachIndexed { index, item ->
-                val on = selected == index
-                val tint by animateColorAsState(
-                    if (on) {
-                        if (indicator) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary
-                    } else MaterialTheme.colorScheme.onSurfaceVariant,
-                    label = "flatTint"
-                )
-                androidx.compose.foundation.layout.Column(
-                    Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable { onSelect(index) }
-                        .padding(vertical = 4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (indicator && on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
-                            .padding(horizontal = 20.dp, vertical = 4.dp)
-                    ) {
-                        Icon(item.icon, contentDescription = tr(item.label), tint = tint, modifier = Modifier.size(24.dp))
-                    }
-                    Text(tr(item.label), color = tint, style = MaterialTheme.typography.labelMedium, maxLines = 1)
-                }
             }
         }
     }

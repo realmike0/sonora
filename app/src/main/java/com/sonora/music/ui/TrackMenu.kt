@@ -131,11 +131,6 @@ fun TrackMenuSheet(vm: PlayerViewModel, track: Track, onDismiss: () -> Unit) {
                 store.toggleLike(track)
             }
 
-            MenuAction(Icons.Rounded.Favorite, "Dedica a qualcuno") {
-                vm.dedicateTrack = track
-                onDismiss()
-            }
-
             MenuAction(Icons.Rounded.PlaylistAdd, "Aggiungi alla playlist") { addingToPlaylist = true }
 
             MenuAction(Icons.Rounded.SkipNext, "Riproduci dopo") {

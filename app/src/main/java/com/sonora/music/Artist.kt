@@ -53,17 +53,6 @@ object ArtistRepository {
         return page
     }
 
-    /** Artisti realmente presenti su YouTube Music (nome + immagine), per la scelta nel widget. */
-    fun searchArtists(query: String): List<Pair<String, String?>> {
-        val ex = ServiceList.YouTube.getSearchExtractor(
-            query, listOf(YoutubeSearchQueryHandlerFactory.MUSIC_ARTISTS), ""
-        )
-        ex.fetchPage()
-        return ex.initialPage.items.filterIsInstance<ChannelInfoItem>().take(8).map {
-            it.name to (it.thumbnails.maxByOrNull { t -> t.height }?.url ?: it.thumbnails.lastOrNull()?.url)
-        }
-    }
-
     private fun artistImage(name: String): String? {
         val ex = ServiceList.YouTube.getSearchExtractor(
             name, listOf(YoutubeSearchQueryHandlerFactory.MUSIC_ARTISTS), ""
