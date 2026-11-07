@@ -18,6 +18,15 @@ object AudioHaptics {
     private var level = 0f
     private var peak = 1f
     private var lastPulse = 0L
+    @Volatile private var sens = 0.5f
+
+    fun sensitivity(c: Context) = c.getSharedPreferences("sonora", Context.MODE_PRIVATE).getFloat("audio_haptics_sens", 0.5f)
+
+    /** 0 = pochi colpi leggeri, 1 = molti colpi forti. */
+    fun setSensitivity(c: Context, v: Float) {
+        sens = v.coerceIn(0f, 1f)
+        c.getSharedPreferences("sonora", Context.MODE_PRIVATE).edit().putFloat("audio_haptics_sens", sens).apply()
+    }
 
     fun enabled(c: Context) = c.getSharedPreferences("sonora", Context.MODE_PRIVATE).getBoolean("audio_haptics", false)
 
@@ -46,6 +55,7 @@ object AudioHaptics {
         if (viz != null || session == 0) return
         if (c.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
         val vib = vibrator(c) ?: return
+        sens = sensitivity(c)
         try {
             val v = Visualizer(session)
             val size = Visualizer.getCaptureSizeRange()[1].coerceAtMost(1024)
@@ -63,12 +73,12 @@ object AudioHaptics {
                     }
                     peak = maxOf(energy, peak * 0.995f, 20f)
                     val now = energy / peak
-                    val beat = now > 0.55f && now > level * 1.15f
+                    val beat = now > 0.85f - 0.6f * sens && now > level * 1.15f
                     level = level * 0.6f + now * 0.4f
                     val t = System.currentTimeMillis()
                     if (beat && t - lastPulse > 110) {
                         lastPulse = t
-                        val amp = (60 + 195 * now).toInt().coerceIn(1, 255)
+                        val amp = ((60 + 195 * now) * (0.5f + sens)).toInt().coerceIn(1, 255)
                         try {
                             vib.vibrate(
                                 if (vib.hasAmplitudeControl()) VibrationEffect.createOneShot(28, amp)

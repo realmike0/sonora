@@ -146,6 +146,13 @@ fun AudioHapticsSection() {
             }
         })
     }
+    if (on) {
+        var sens by remember { mutableFloatStateOf(com.sonora.music.AudioHaptics.sensitivity(c)) }
+        androidx.compose.material3.Slider(
+            value = sens,
+            onValueChange = { sens = it; com.sonora.music.AudioHaptics.setSensitivity(c, it) }
+        )
+    }
 }
 
 @Composable
