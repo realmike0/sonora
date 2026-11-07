@@ -24,6 +24,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         Perf.init(this)
         com.sonora.music.ui.Lang.load(this)
+        com.sonora.music.ui.AppStyle.load(this)
         WrappedReminder.schedule(this)
         handleIntent(intent)
         Headsets.startService(this)
@@ -39,11 +40,22 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent?) {
         intent?.getStringExtra(EXTRA_ARTIST)?.takeIf { it.isNotBlank() }?.let { vm.artistOpen = it }
         if (intent?.getBooleanExtra(EXTRA_WRAPPED, false) == true) vm.wrappedOpen = true
+        intent?.getStringExtra(EXTRA_PLAY_ID)?.takeIf { it.isNotBlank() }?.let { id ->
+            vm.play(
+                listOf(Track(id, intent.getStringExtra(EXTRA_PLAY_TITLE) ?: "", intent.getStringExtra(EXTRA_PLAY_ARTIST) ?: "",
+                    intent.getStringExtra(EXTRA_PLAY_THUMB), 0L)), 0
+            )
+            intent.removeExtra(EXTRA_PLAY_ID)
+        }
     }
 
     companion object {
         const val EXTRA_ARTIST = "open_artist"
         const val EXTRA_WRAPPED = "open_wrapped"
+        const val EXTRA_PLAY_ID = "play_id"
+        const val EXTRA_PLAY_TITLE = "play_title"
+        const val EXTRA_PLAY_ARTIST = "play_artist"
+        const val EXTRA_PLAY_THUMB = "play_thumb"
     }
 
     override fun onNewIntent(intent: Intent) {

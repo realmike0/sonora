@@ -72,12 +72,12 @@ object GoogleSync {
 
     // ───────── Richieste ─────────
 
-    private fun cookieValue(cookie: String, name: String): String? =
+    internal fun cookieValue(cookie: String, name: String): String? =
         cookie.split(";").map { it.trim() }
             .firstOrNull { it.startsWith("$name=") }
             ?.substringAfter("=")
 
-    private fun sha1(s: String): String =
+    internal fun sha1(s: String): String =
         MessageDigest.getInstance("SHA-1").digest(s.toByteArray())
             .joinToString("") { "%02x".format(it) }
 

@@ -71,12 +71,14 @@ class PlaybackService : MediaSessionService() {
 
         // Equalizzatore sulla sessione audio del player.
         Eq.attach(this, player.audioSessionId)
+        AudioHaptics.attach(this, player.audioSessionId)
         player.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
             override fun onAudioSessionIdChanged(
                 eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
                 audioSessionId: Int
             ) {
                 Eq.attach(this@PlaybackService, audioSessionId)
+                AudioHaptics.attach(this@PlaybackService, audioSessionId)
             }
         })
 
@@ -259,6 +261,7 @@ class PlaybackService : MediaSessionService() {
         ghost?.release()
         ghost = null
         Eq.release()
+        AudioHaptics.release()
         session?.run {
             player.release()
             release()

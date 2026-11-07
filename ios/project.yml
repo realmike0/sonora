@@ -7,11 +7,13 @@ targets:
   Sonora:
     type: application
     platform: iOS
-    sources: [Sonora]
+    sources:
+      - path: Sonora.swiftpm
+        excludes: [Package.swift]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sonora.music
-        MARKETING_VERSION: "0.50"
+        MARKETING_VERSION: "0.80"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Sonora

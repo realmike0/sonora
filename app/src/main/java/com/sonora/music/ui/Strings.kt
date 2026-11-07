@@ -5,27 +5,71 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 /** Lingua dell'app: "auto" segue il telefono, altrimenti it / en / es / de. */
 object Lang {
     var code by mutableStateOf("auto")
         private set
 
-    val options = listOf("auto" to "Automatica", "it" to "Italiano", "en" to "English", "es" to "Español", "de" to "Deutsch")
+    val options = listOf(
+        "auto" to "Automatica", "it" to "Italiano", "en" to "English", "es" to "Español", "de" to "Deutsch",
+        "fr" to "Français", "tr" to "Türkçe", "sq" to "Shqip"
+    )
+
+    /** Lingue tradotte al volo (la prima volta serve internet; poi restano salvate sul telefono). */
+    val dynamicLangs = setOf("fr", "tr", "sq")
+
+    private var dyn by mutableStateOf<Map<String, String>>(emptyMap())
+    private var dynLang = ""
+    private var working = false
+
+    fun dynamic(s: String): String? = dyn[s]
+
+    /** Carica le traduzioni salvate della lingua attuale e scarica quelle che mancano. */
+    fun prepare(c: Context) {
+        val l = effective()
+        if (l !in dynamicLangs) return
+        val p = c.getSharedPreferences("sonora", Context.MODE_PRIVATE)
+        val saved = runCatching {
+            val o = org.json.JSONObject(p.getString("dyn_$l", "{}") ?: "{}")
+            o.keys().asSequence().associateWith { o.getString(it) }
+        }.getOrDefault(emptyMap())
+        dyn = saved
+        dynLang = l
+        val missing = TABLE.keys.filter { it !in saved }
+        if (missing.isEmpty() || working) return
+        working = true
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            try {
+                val english = missing.map { TABLE[it]!![0] }
+                val out = com.sonora.music.LyricsTranslator.translate(english, l)
+                if (out != null && out.size == missing.size && dynLang == l) {
+                    val merged = saved + missing.zip(out).toMap()
+                    p.edit().putString("dyn_$l", org.json.JSONObject(merged).toString()).apply()
+                    dyn = merged
+                }
+            } finally {
+                working = false
+            }
+        }
+    }
 
     fun load(c: Context) {
         code = c.getSharedPreferences("sonora", Context.MODE_PRIVATE).getString("lang", "auto") ?: "auto"
+        prepare(c)
     }
 
     fun set(c: Context, value: String) {
         code = value
         c.getSharedPreferences("sonora", Context.MODE_PRIVATE).edit().putString("lang", value).apply()
+        prepare(c)
     }
 
     /** Lingua effettiva (mai "auto"). Le lingue non supportate usano l'inglese. */
     fun effective(): String {
         val v = if (code == "auto") Locale.getDefault().language else code
-        return if (v in setOf("it", "en", "es", "de")) v else "en"
+        return if (v in setOf("it", "en", "es", "de", "fr", "tr", "sq")) v else "en"
     }
 }
 
@@ -33,11 +77,38 @@ object Lang {
 fun tr(s: String): String {
     val l = Lang.effective()
     if (l == "it") return s
+    if (l in Lang.dynamicLangs) return Lang.dynamic(s) ?: TABLE[s]?.get(0) ?: s
     val idx = when (l) { "en" -> 0; "es" -> 1; else -> 2 }
     return TABLE[s]?.get(idx) ?: s
 }
 
 private val TABLE: Map<String, List<String>> = mapOf(
+    "Verifica la tua email" to listOf("Verify your email", "Verifica tu correo", "Bestätige deine E-Mail"),
+    "Ti abbiamo mandato un codice a 6 cifre. Serve per scrivere dediche." to listOf("We sent you a 6-digit code. It is needed to write dedications.", "Te enviamos un código de 6 dígitos. Es necesario para escribir dedicatorias.", "Wir haben dir einen 6-stelligen Code geschickt. Er wird zum Schreiben von Widmungen benötigt."),
+    "Codice a 6 cifre" to listOf("6-digit code", "Código de 6 dígitos", "6-stelliger Code"),
+    "Verifica" to listOf("Verify", "Verificar", "Bestätigen"),
+    "Invia di nuovo" to listOf("Send again", "Enviar de nuevo", "Erneut senden"),
+    "Codice inviato" to listOf("Code sent", "Código enviado", "Code gesendet"),
+    "Verifica la tua email nel Profilo per scrivere dediche." to listOf("Verify your email in Profile to write dedications.", "Verifica tu correo en el Perfil para escribir dedicatorias.", "Bestätige deine E-Mail im Profil, um Widmungen zu schreiben."),
+    "Dediche" to listOf("Dedications", "Dedicatorias", "Widmungen"),
+    "Dedica a qualcuno" to listOf("Dedicate to someone", "Dedicar a alguien", "Jemandem widmen"),
+    "Per chi è" to listOf("Who is it for", "Para quién es", "Für wen"),
+    "Messaggio" to listOf("Message", "Mensaje", "Nachricht"),
+    "Il tuo nome" to listOf("Your name", "Tu nombre", "Dein Name"),
+    "Pubblica" to listOf("Publish", "Publicar", "Veröffentlichen"),
+    "Segnala" to listOf("Report", "Denunciar", "Melden"),
+    "Ancora nessuna dedica" to listOf("No dedications yet", "Aún no hay dedicatorias", "Noch keine Widmungen"),
+    "Accedi con Sonora ID nelle impostazioni per vedere e fare dediche." to listOf("Sign in with Sonora ID in settings to see and send dedications.", "Inicia sesión con Sonora ID en ajustes para ver y enviar dedicatorias.", "Melde dich in den Einstellungen mit Sonora ID an, um Widmungen zu sehen und zu senden."),
+    "Accedi con Sonora ID nelle impostazioni per fare una dedica." to listOf("Sign in with Sonora ID in settings to send a dedication.", "Inicia sesión con Sonora ID en ajustes para enviar una dedicatoria.", "Melde dich in den Einstellungen mit Sonora ID an, um eine Widmung zu senden."),
+    "La dedica è visibile a tutti gli utenti Sonora ID. Niente link o contatti." to listOf("The dedication is visible to all Sonora ID users. No links or contact details.", "La dedicatoria es visible para todos los usuarios de Sonora ID. Sin enlaces ni contactos.", "Die Widmung ist für alle Sonora-ID-Nutzer sichtbar. Keine Links oder Kontaktdaten."),
+    "L'AI sta ascoltando…" to listOf("The AI is listening…", "La IA está escuchando…", "Die KI hört zu…"),
+    "L'AI sta mixando…" to listOf("The AI is mixing…", "La IA está mezclando…", "Die KI mixt…"),
+    "Mix AI" to listOf("AI mix", "Mix IA", "KI-Mix"),
+    "Scelti per te dall'AI" to listOf("Picked for you by AI", "Elegidos para ti por la IA", "Von der KI für dich ausgewählt"),
+    "Ricerca vocale" to listOf("Voice search", "Búsqueda por voz", "Sprachsuche"),
+    "Ricerca vocale non disponibile" to listOf("Voice search unavailable", "Búsqueda por voz no disponible", "Sprachsuche nicht verfügbar"),
+    "Haptics audio" to listOf("Audio haptics", "Hápticos de audio", "Audio-Haptik"),
+    "Altri dispositivi…" to listOf("Other devices…", "Otros dispositivos…", "Andere Geräte…"),
     "Accedi a Google" to listOf("Sign in to Google", "Iniciar sesión en Google", "Bei Google anmelden"),
     "Accetto" to listOf("I agree", "Acepto", "Ich stimme zu"),
     "Account locale" to listOf("Local account", "Cuenta local", "Lokales Konto"),
@@ -173,4 +244,23 @@ private val TABLE: Map<String, List<String>> = mapOf(
     "Scopri com'è stato il tuo anno in musica" to listOf("See how your year in music went", "Descubre cómo fue tu año en música", "Entdecke dein Musikjahr"),
     "Video" to listOf("Video", "Vídeo", "Video"),
     "Testo" to listOf("Lyrics", "Letra", "Songtext"),
+    "Stile" to listOf("Style", "Estilo", "Stil"),
+    "Crea Sonora ID" to listOf("Create Sonora ID", "Crear Sonora ID", "Sonora-ID erstellen"),
+    "Esci" to listOf("Sign out", "Cerrar sesión", "Abmelden"),
+    "Elimina Sonora ID" to listOf("Delete Sonora ID", "Eliminar Sonora ID", "Sonora-ID löschen"),
+    "Eliminare il Sonora ID?" to listOf("Delete the Sonora ID?", "¿Eliminar el Sonora ID?", "Sonora-ID löschen?"),
+    "L'account e i preferiti sul server verranno cancellati. Sul telefono resta tutto." to listOf("The account and favorites on the server will be deleted. Everything stays on your phone.", "Se borrarán la cuenta y los favoritos del servidor. En el teléfono se queda todo.", "Konto und Favoriten auf dem Server werden gelöscht. Auf dem Telefon bleibt alles."),
+    "Il Sonora ID salva sul server la tua email (solo come impronta, mai in chiaro), la password protetta e i tuoi brani preferiti per sincronizzarli. Se dimentichi la password non si può recuperare. Puoi eliminare tutto quando vuoi." to listOf("Sonora ID stores on the server your email (only as a hash, never in plain text), your protected password and your favorite songs to sync them. If you forget the password it cannot be recovered. You can delete everything anytime.", "El Sonora ID guarda en el servidor tu correo (solo como huella, nunca en claro), la contraseña protegida y tus canciones favoritas para sincronizarlas. Si olvidas la contraseña no se puede recuperar. Puedes borrarlo todo cuando quieras.", "Die Sonora-ID speichert auf dem Server deine E-Mail (nur als Hash, nie im Klartext), das geschützte Passwort und deine Lieblingstitel zur Synchronisierung. Ein vergessenes Passwort kann nicht wiederhergestellt werden. Du kannst jederzeit alles löschen."),
+    "Accetto la privacy policy" to listOf("I accept the privacy policy", "Acepto la política de privacidad", "Ich akzeptiere die Datenschutzerklärung"),
+    "Attendi…" to listOf("Please wait…", "Espera…", "Bitte warten…"),
+    "Sincronizzato" to listOf("Synced", "Sincronizado", "Synchronisiert"),
+    "Scarica tutti" to listOf("Download all", "Descargar todo", "Alle herunterladen"),
+    "Sincronizza ora con Sonora ID" to listOf("Sync now with Sonora ID", "Sincronizar ahora con Sonora ID", "Jetzt mit Sonora-ID synchronisieren"),
+    "Accedi a Sonora ID" to listOf("Sign in to Sonora ID", "Iniciar sesión en Sonora ID", "Bei Sonora-ID anmelden"),
+    "Commenti" to listOf("Comments", "Comentarios", "Kommentare"),
+    "Nessun commento" to listOf("No comments", "Sin comentarios", "Keine Kommentare"),
+    "Collega l'account Google nelle impostazioni per commentare." to listOf("Connect your Google account in settings to comment.", "Conecta tu cuenta de Google en ajustes para comentar.", "Verbinde dein Google-Konto in den Einstellungen, um zu kommentieren."),
+    "Aggiungi un commento…" to listOf("Add a comment…", "Añade un comentario…", "Kommentar hinzufügen…"),
+    "Invia" to listOf("Send", "Enviar", "Senden"),
+    "Commento pubblicato" to listOf("Comment posted", "Comentario publicado", "Kommentar veröffentlicht"),
 )

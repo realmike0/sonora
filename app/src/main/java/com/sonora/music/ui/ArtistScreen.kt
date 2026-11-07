@@ -188,7 +188,7 @@ internal val CookieShape = object : androidx.compose.ui.graphics.Shape {
 }
 
 @Composable
-private fun RoundBtn(onClick: () -> Unit, size: androidx.compose.ui.unit.Dp = 48.dp, content: @Composable () -> Unit) {
+internal fun RoundBtn(onClick: () -> Unit, size: androidx.compose.ui.unit.Dp = 48.dp, content: @Composable () -> Unit) {
     Box(
         Modifier.size(size).clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
@@ -278,6 +278,7 @@ private fun ArtistContent(
         }
 
         if (songs.isNotEmpty()) {
+            item(key = "ai-rating") { AiRatingCard("artist", page.name, "", songs.map { it.title }, accent) }
             item(key = "songs-title") { SectionTitle("Brani popolari") }
             itemsIndexed(songs, key = { _, t -> "s-" + t.id }) { index, track ->
                 val top = if (index == 0) 28.dp else 6.dp
@@ -416,6 +417,9 @@ private fun AlbumView(
         }
 
         val list = tracks
+        if (!list.isNullOrEmpty()) {
+            item(key = "ai-album") { AiRatingCard("album", album.title, album.subtitle, list.map { it.title }, accent) }
+        }
         when {
             error != null -> item(key = "aerr") {
                 Text(error ?: "", Modifier.padding(24.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)

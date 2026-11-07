@@ -6,3 +6,6 @@ compatibility_date = "2024-11-01"
 binding = "DB"
 database_name = "sonora_wrapped"
 database_id = "1c5ec0c3-defc-4a34-8843-4cc5da81e477"
+
+[ai]
+binding = "AI"

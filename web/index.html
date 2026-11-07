@@ -119,7 +119,7 @@ function play(i){if(i<0||i>=list.length)return;idx=i;cur=list[i];var t=cur;
  $("mini").style.display="flex";$("mi").src=t.thumb||"";$("mt").innerHTML=esc(t.title);$("ma").innerHTML=esc(t.artist);
  $("cover").src=t.thumb||"";$("fbg").src=t.thumb||"";$("ft").innerHTML=esc(t.title);$("fa").innerHTML=esc(t.artist);
  favUi();setPlaying(false);status("Caricamento…");stopYt();document.title=t.title+" · Sonora";
- tried=0;mode="a";au.src=API+"/v1/web/audio?id="+t.id;var p=au.play();if(p&&p.catch)p.catch(function(){status("Tocca play per iniziare")});status("");
+ tried=1;mode="a";var mine=t.id;resolve(mine,0,function(url){if(!cur||cur.id!==mine)return;if(url){au.src=url;var p=au.play();if(p&&p.catch)p.catch(function(){status("Tocca play per iniziare")});status("")}else useYt(mine)});
  try{if(navigator.mediaSession){navigator.mediaSession.metadata=new MediaMetadata({title:t.title,artist:t.artist,artwork:t.thumb?[{src:t.thumb,sizes:"512x512"}]:[]});
   navigator.mediaSession.setActionHandler("play",toggle);navigator.mediaSession.setActionHandler("pause",toggle);
   navigator.mediaSession.setActionHandler("nexttrack",next);navigator.mediaSession.setActionHandler("previoustrack",prev)}}catch(e){}
