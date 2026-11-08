@@ -12,6 +12,7 @@ cat > config.yml <<EOC
 repo_url: ${REPO_URL}
 repo_name: Sonora
 repo_description: Repository ufficiale di Sonora (beta).
+repo_icon: icon.png
 repo_keyalias: sonora-repo
 keystore: keystore.p12
 keystorepass: ${FDROID_KEYPASS}
