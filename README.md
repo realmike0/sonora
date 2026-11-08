@@ -2,102 +2,90 @@
 
 # 🎵 Sonora
 
-**Il tuo client musicale per Android, in stile YouTube Music.**
-Ascolta in background, salva i brani offline, leggi i testi sincronizzati.
+**My music app for Android, YouTube Music style** 😎
+Plays in the background, saves songs offline and the lyrics go in time 🎤
 
 ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
-![Versione](https://img.shields.io/badge/versione-0.80--beta-6750A4)
+![Version](https://img.shields.io/badge/version-0.80--beta-6750A4)
 ![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
 
-[⬇️ **Scarica l'APK**](https://github.com/realmike0/sonora/releases) · [💬 **Canale Telegram**](https://t.me/sonoraclient)
+<a href="https://realmike0.github.io/sonora/fdroid/"><img src="https://f-droid.org/badge/get-it-on.png" alt="Get it on F-Droid" height="80"></a>
+<a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/realmike0/sonora"><img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="80"></a>
+
+[⬇️ **Download the APK**](https://github.com/realmike0/sonora/releases) · [💬 **Telegram channel**](https://t.me/sonoraclient)
 
 </div>
 
 ---
 
-## ✨ Cos'è Sonora
+## ✨ What is Sonora
 
-Sonora è un'app Android per ascoltare musica da YouTube Music **con i colori del tuo telefono**: l'interfaccia segue Material You e si adatta allo sfondo che hai scelto. La musica continua anche con lo schermo spento o l'app in background, con i controlli nella notifica e nella schermata di blocco.
+Sonora is an app to listen to music from YouTube Music **in your phone's colors** 🎨: the interface follows Material You and adapts to the wallpaper you picked. Music keeps playing with the screen off, with controls in the notification and on the lock screen.
 
-È un progetto indipendente, nato e portato avanti da **realmike0**, ed è in **beta**: arrivano aggiornamenti spesso.
+I made it myself, from my phone 📱 (yes, with Termux!). It's still in **beta**, so updates come out often. If you find a bug, tell me 🙏
 
-## 🚀 Cosa puoi fare
+## 🚀 What it can do
 
-- 🏠 **Home con le scelte del giorno**: una griglia 3×3 che cambia ogni giorno, poi gli scaffali di brani come su YouTube Music.
-- 🔎 **Ricerca** di brani e artisti, con i brani che hai riprodotto dopo le tue ricerche.
-- 🎧 **Ascolto in background** con notifica multimediale.
-- 📝 **Testi sincronizzati** riga per riga (fonte: LRCLIB).
-- ❤️ **Preferiti e playlist** tutte tue, salvate sul telefono.
-- 🔗 **Account Google opzionale**: collegalo per importare le tue playlist di YouTube Music con tutti i brani; se lo salti, usi un account locale.
-- 💾 **Cache automatica**: ogni brano che ascolti viene salvato, così lo ritrovi anche senza rete.
-- ⬇️ **Download**: tieni premuto su un brano e scegli *Scarica*. Se era già in cache passa nei download senza riscaricarlo.
-- 🗂️ **Raccolta** con due sezioni separate: *In cache* e *Scaricati*.
-- ⚙️ **Gestione della memoria**: scegli il limite della cache (1, 2, 5, 10 GB o illimitata) o svuotala quando vuoi.
-- 🔄 **Aggiornamenti automatici**: Sonora controlla le release su GitHub e li installa da solo.
-- 🎧 **Cuffie, auricolari, speaker e auto**: quando si collegano, anche ad app chiusa, arriva una notifica blu con "Inizia ad ascoltare" (preferiti in ordine casuale). Con l'app aperta compare una schermata con un modello 3D che gira.
-- 🎚️ **Mixaggio fluido** tra un brano e l'altro e **testi** con sfocatura sopra e sotto la riga corrente.
-- 📱 **Tablet** in orizzontale: interfaccia a due pannelli. **Telefono** in orizzontale: modalità AOD con ora, notifiche e brano.
-- ℹ️ **Menu del brano** (pressione prolungata): durata, data di pubblicazione, aggiungi ai preferiti o a una playlist, scarica.
+- 🏠 **Home with daily picks**: a 3×3 grid that changes every day, then song shelves like on YouTube Music
+- 🔎 **Search** for songs and artists, also **by voice** 🎙️
+- 🎧 **Background playback** with a media notification
+- 📝 **Synced lyrics** line by line, from 5 sources, with translation and a share image
+- ❤️ **Favorites and playlists** that are all yours
+- 🔗 **Optional Google account**: link it to import your YouTube Music playlists, skip it to use a local account
+- 💾 **Automatic cache** and ⬇️ **downloads**: long-press a song and choose *Download*
+- ⚙️ **Storage under control**: cache limit from 1 GB to unlimited, or clear it whenever you want
+- 🤖 **AI**: rating for artists and albums, daily picks and queue remix
+- 💌 **Dedications**: dedicate a song to someone, everyone with a Sonora ID can see it
+- 🌍 **Languages**: Italiano, English, Español, Deutsch, Français, Türkçe and Shqip
+- 📳 **Audio haptics**: your phone vibrates to the beat, with an adjustable sensitivity
+- 🎧 **Headphones, speakers, car**: as soon as they connect you get a blue notification with "Start listening"
+- 🎚️ **Smooth mixing** between songs and an equalizer
+- 📱 **Tablet** with two panes, **landscape phone** with AOD mode
+- 🔄 **Automatic updates** from the GitHub releases
 
-## 🆕 Novità della 0.50
+## 🔒 Privacy and Wrapped
 
-- **Wrapped** di ogni anno (locale, oppure con server se accetti il tracciamento) · coda di riproduzione · pillola del volume con riconoscimento del dispositivo (cuffie, speaker, auto) e vibrazione leggera
-- **Widget**: ascolti e in riproduzione, attività recente, scorciatoia all'artista che scegli
-- Qualità audio (M4A/WebM × alta/media/bassa) · dissolvenza avanzata · pagina artista ridisegnata · grafica leggera automatica sui dispositivi datati
+Tracking is **optional**: after onboarding you get asked, and if you say no nothing leaves your phone. If you accept, you verify with Telegram or with an email code and only from then your listening goes to the server for the Wrapped. You can turn it off or delete everything from Settings. All the details are in [docs/PRIVACY.md](docs/PRIVACY.md), the server guide is in [server/README.md](server/README.md).
 
-- **Testi da 5 fonti** (LRCLIB, BetterLyrics, Unison, LyricsPlus, KuGou) con scelta automatica del testo migliore · **immagine dai testi** da condividere · feedback aptico al tocco · Wrapped di tutti gli anni
+## 📲 How to install
 
-- **0.60:** gesto indietro predittivo · equalizzatore · interruttore audio/video originale · sovrapposizione vera tra i brani
-- **0.60.1:** nuovo player a schermo intero (barra a onda, controlli a pillola, casuale) · schermata testi con controlli animati · rimosso l'accesso alle notifiche (blocco Play Protect)
-- **0.60.2:** impostazioni più pulite (profilo con account Google, niente descrizioni) · Wrapped visibile a dicembre · APK firmato come release
-- **0.70:** Esplora (statistiche settimanali) · generi con playlist nella ricerca · playlist in stile album · lingue Italiano/English/Español/Deutsch · traduzione dei testi · notifica del Wrapped il 10 dicembre
-- **0.80:** AI (voto ad artisti e album, scelte del giorno, mix della coda) · ricerca vocale · francese, turco, albanese · widget rinnovati · haptics audio · cambio dispositivo di uscita · dediche con il cuore · Sonora Web, player indipendente nella cartella web/ (anche per Android < 8)
-- **0.71:** stili grafici (Material 3 Expressive, Material You, Liquid Glass, Miuix) · Sonora ID (email e password, preferiti sincronizzati) · commenti di YouTube Music · pagine playlist in stile artista · menu a pressione lunga in Raccolta
+Pick the way you like 👇
 
-## 🔒 Privacy e Wrapped
+**1️⃣ F-Droid** 🟢 — tap the "Get it on F-Droid" button above, add the repository and install Sonora. Updates arrive on their own.
 
-Il tracciamento è **facoltativo**: dopo l'onboarding ti viene chiesto e se rifiuti nulla lascia il telefono. Se accetti, verifichi chi sei con Telegram (numero) o con un codice via email e solo da quel momento i tuoi ascolti vanno al server per il Wrapped. Puoi spegnere o cancellare tutto dalle Impostazioni. Dettagli in [docs/PRIVACY.md](docs/PRIVACY.md); guida al server in [server/README.md](server/README.md).
+**2️⃣ Obtainium** 🟣 — tap the "Get it on Obtainium" button above. Or in Obtainium: *Add app*, paste `https://github.com/realmike0/sonora` and turn on **Include pre-releases** (betas are pre-releases).
 
-## 📲 Come installarla
+**3️⃣ By hand** 📦 — download the latest `.apk` from the [Releases](https://github.com/realmike0/sonora/releases) page and open it. If Android asks, allow installing from this source.
 
-1. Vai alla pagina delle [**Release**](https://github.com/realmike0/sonora/releases) e scarica l'ultimo file `.apk`.
-   *(In alternativa, scarica l'APK più recente dalla sezione **Actions** del repository, nel risultato dell'ultima build.)*
-2. Aprilo dal telefono. Se Android lo chiede, consenti l'installazione da questa fonte.
-3. Alla prima apertura scrivi il tuo nome e scegli se collegare l'account Google.
-4. Su Android 13+ accetta le notifiche, servono per i controlli di riproduzione.
+On first launch write your name and choose whether to link your Google account. On Android 13+ allow notifications, they are needed for the playback controls 🔔
 
-**iOS (sperimentale):** il codice è in `ios/`. La build produce un IPA non firmato (Actions → *Build iOS IPA*) da installare con AltStore o Sideloadly. Su iOS 26+ l'interfaccia usa Liquid Glass; sulle versioni precedenti l'interfaccia standard.
+> 💡 If you use F-Droid or Obtainium you can turn off the automatic check in Sonora's *Settings → Updates*.
 
-**Requisiti:** Android 8.0 (API 26) o successivo.
+**Requirements:** Android 8.0 (API 26) or later.
 
-### 🔄 Aggiornamenti con Obtainium
+**iOS (experimental) 🍎:** the code is in `ios/`, made for Swift Playgrounds. For now I only use it to test, nothing official.
 
-Per ricevere automaticamente ogni nuova versione puoi usare [Obtainium](https://github.com/ImranR98/Obtainium):
+## 🔧 How it's made
 
-[➕ **Aggiungi Sonora a Obtainium**](obtainium://add/https://github.com/realmike0/sonora)
+- Interface in **Kotlin + Jetpack Compose** (Material 3)
+- Playback with **Media3 / ExoPlayer** in a foreground service, so it never stops
+- Songs are found with **[NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor)**
+- Lyrics come from **[LRCLIB](https://lrclib.net)** and other sources
+- The server (Wrapped, Sonora ID, dedications, AI) runs on **Cloudflare Workers + D1**
+- Profile, favorites, playlists and history stay **only on your phone**, unless you turn on sync
+- There's also **Sonora Web**, a separate player in the `web/` folder, for older browsers and devices
 
-Oppure, in Obtainium, tocca *Aggiungi app*, incolla `https://github.com/realmike0/sonora` e attiva **Includi pre-release** (le versioni beta sono pre-release). Se usi Obtainium, puoi spegnere il controllo automatico in *Impostazioni → Aggiornamenti* di Sonora.
+## 💬 Stay updated
 
-## 🔧 Come funziona
-
-- Interfaccia in **Kotlin + Jetpack Compose** (Material 3).
-- Riproduzione con **Media3 / ExoPlayer** in un servizio in primo piano, così non si ferma in background.
-- I brani vengono trovati con **[NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor)**; l'importazione delle playlist usa l'accesso web di YouTube Music con la sessione del tuo account Google.
-- I testi arrivano da **[LRCLIB](https://lrclib.net)**.
-- Profilo, preferiti, playlist e cronologia restano **solo sul tuo telefono**.
-- La cache audio e i download usano due archivi separati; la cache elimina da sola i brani meno recenti quando supera il limite scelto.
-
-## 💬 Resta aggiornato
-
-Novità, anteprime delle nuove versioni e supporto sul canale Telegram:
+News, previews and support on the Telegram channel 👇
 
 ### 👉 [t.me/sonoraclient](https://t.me/sonoraclient)
 
-Entra per non perdere nessun aggiornamento e per segnalare bug o proporre idee.
+Join so you don't miss any update and to report bugs or suggest ideas 💡
 
-## ⚠️ Nota
+## ⚠️ Note
 
-Sonora non è affiliata a YouTube, Google o YouTube Music. L'importazione delle playlist si basa su servizi web non ufficiali e potrebbe smettere di funzionare se YouTube cambia qualcosa. Usala per ascoltare contenuti nel rispetto dei termini dei servizi che utilizzi.
+Sonora is not affiliated with YouTube, Google or YouTube Music. It relies on unofficial web services and might stop working if YouTube changes something. Use it to listen to content in respect of the terms of the services you use.
 
 ---
 
@@ -106,6 +94,3 @@ Sonora non è affiliata a YouTube, Google o YouTube Music. L'importazione delle 
 *Made with ❤️ by [realmike0](https://www.github.com/realmike0) on GitHub*
 
 </div>
-
-## Installare con F-Droid
-Aggiungi il repository di Sonora in F-Droid (Impostazioni → Repository → +) con il link che trovi nel riepilogo dell'ultima esecuzione di "Sonora Pages" su GitHub Actions.

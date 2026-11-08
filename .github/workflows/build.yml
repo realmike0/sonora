@@ -38,4 +38,5 @@ jobs:
           tag_name: v${{ steps.ver.outputs.v }}
           name: Sonora ${{ steps.ver.outputs.v }}
           prerelease: true
+          body_path: RELEASE_NOTES.md
           files: Sonora-v${{ steps.ver.outputs.v }}.apk

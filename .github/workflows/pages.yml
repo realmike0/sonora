@@ -51,6 +51,7 @@ jobs:
           mkdir -p _site/fdroid
           cp -r fdroid/repo _site/fdroid/repo
           FP=$(sed -n 's/^Impronta del repository: //p' fp.txt)
+          sed "s/__FP__/${FP}/g" fdroid/site/index.html > _site/fdroid/index.html
           {
             echo "### Repository F-Droid"
             echo "Link da aggiungere in F-Droid: \`${REPO_URL}?fingerprint=${FP}\`"
