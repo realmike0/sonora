@@ -13,6 +13,15 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Parla con Sonora Framework (stessa firma): lo dichiariamo anche qui, così il permesso vale in qualunque ordine si installino. -->
+    <permission
+        android:name="com.sonora.framework.permission.ACCOUNTS"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.sonora.framework.permission.ACCOUNTS" />
+    <queries>
+        <package android:name="com.sonora.framework" />
+    </queries>
+
     <application
         android:name=".SonoraApp"
         android:allowBackup="false"

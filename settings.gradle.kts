@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Sonora"
 include(":app")
+include(":framework")

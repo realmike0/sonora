@@ -102,15 +102,58 @@ async function tooMany(env, key, max) {
   await env.DB.prepare("INSERT INTO rl(k,n) VALUES(?,1) ON CONFLICT(k) DO UPDATE SET n=n+1").bind(k).run();
   return false;
 }
+async function passwordOk(env, uid, pw) {
+  if (typeof pw !== "string" || pw.length > 200) return false;
+  const u = await env.DB.prepare("SELECT salt,pw_hash FROM sid_users WHERE user_id=?").bind(uid).first();
+  return !!u && sameStr(await pbkdf2(pw, u.salt), u.pw_hash);
+}
 const SID_TTL = 90 * 86400000; // le sessioni durano 90 giorni
-async function newSidToken(env, uid) {
+// Dispositivo di una sessione: id casuale generato dall'app (mai l'IP in chiaro), nome, luogo approssimativo.
+const devInfo = (req) => {
+  const ip = req.headers.get("cf-connecting-ip") || "";
+  const masked = ip.includes(":") ? ip.split(":").slice(0, 3).join(":") + ":…" : ip.split(".").slice(0, 2).join(".") + ".x.x";
+  const cf = req.cf || {};
+  return {
+    id: String(req.headers.get("x-device-id") || "").replace(/[^\w-]/g, "").slice(0, 64),
+    name: String(req.headers.get("x-device-name") || "").replace(/[\u0000-\u001f<>]/g, " ").trim().slice(0, 60) || "Dispositivo sconosciuto",
+    place: [cf.city, cf.country].filter(Boolean).join(", ").slice(0, 80), masked,
+  };
+};
+async function newSidToken(env, uid, req) {
   const token = rnd(32);
   const th = await sha(token);
-  await env.DB.batch([
+  const d = req ? devInfo(req) : null;
+  const now = Date.now();
+  const batch = [];
+  // Stesso dispositivo = stessa sessione: le vecchie sessioni di quel dispositivo vengono sostituite.
+  if (d && d.id) {
+    const dh = await sha(uid + d.id);
+    batch.push(
+      env.DB.prepare("DELETE FROM sid_tokens WHERE token_hash IN (SELECT token_hash FROM sid_dev WHERE user_id=? AND dev_id=?)").bind(uid, dh),
+      env.DB.prepare("DELETE FROM sid_dev WHERE user_id=? AND dev_id=?").bind(uid, dh),
+    );
+  }
+  batch.push(
     env.DB.prepare("INSERT INTO sid_tokens(token_hash,user_id) VALUES(?,?)").bind(th, uid),
-    env.DB.prepare("INSERT OR REPLACE INTO sid_tok_meta(token_hash,created) VALUES(?,?)").bind(th, Date.now()),
-  ]);
+    env.DB.prepare("INSERT OR REPLACE INTO sid_tok_meta(token_hash,created) VALUES(?,?)").bind(th, now),
+  );
+  if (d) batch.push(env.DB.prepare("INSERT OR REPLACE INTO sid_dev(token_hash,user_id,dev_id,name,place,ip_mask,created,last) VALUES(?,?,?,?,?,?,?,?)")
+    .bind(th, uid, d.id ? await sha(uid + d.id) : "", d.name, d.place, d.masked, now, now));
+  await env.DB.batch(batch);
   return token;
+}
+// Email "nuovo accesso": solo se il dispositivo non è mai stato usato con questo account e l'account ne ha già altri.
+async function notifyNewLogin(env, req, uid, email) {
+  if (!keyReady(env) || !email) return;
+  const d = devInfo(req);
+  const dh = d.id ? await sha(uid + d.id) : "";
+  const any = await env.DB.prepare("SELECT 1 AS x FROM sid_dev WHERE user_id=? LIMIT 1").bind(uid).first();
+  if (!any) return;
+  const known = dh && (await env.DB.prepare("SELECT 1 AS x FROM sid_dev WHERE user_id=? AND dev_id=? LIMIT 1").bind(uid, dh).first());
+  if (known) return;
+  const when = new Date().toLocaleString("it-IT", { timeZone: "Europe/Rome" });
+  await sendMail(env, email, "Nuovo accesso al tuo Sonora ID",
+    `Qualcuno ha effettuato l'accesso al tuo Sonora ID.\n\nDispositivo: ${d.name}\nPosizione approssimativa: ${d.place || "sconosciuta"}\nIP: ${d.masked}\nQuando: ${when}\n\nSei stato tu? Allora non devi fare niente.\nSe non sei stato tu, apri Sonora → Gestisci → Dispositivi collegati, scollega il dispositivo e cambia la password.`).catch(() => false);
 }
 async function sidFrom(req, env) {
   const m = (req.headers.get("authorization") || "").match(/^Bearer (.+)$/);
@@ -126,6 +169,7 @@ async function sidFrom(req, env) {
     await env.DB.batch([
       env.DB.prepare("DELETE FROM sid_tokens WHERE token_hash=?").bind(th),
       env.DB.prepare("DELETE FROM sid_tok_meta WHERE token_hash=?").bind(th),
+      env.DB.prepare("DELETE FROM sid_dev WHERE token_hash=?").bind(th),
     ]);
     return null;
   }
@@ -154,7 +198,7 @@ async function sonoraId(req, env, path) {
       await env.DB.batch([env.DB.prepare("DELETE FROM sid_mail WHERE user_id=?").bind(uid), env.DB.prepare("DELETE FROM sid_users WHERE user_id=?").bind(uid)]);
       return err("Invio email non riuscito: controlla l'indirizzo e riprova", 502);
     }
-    return J({ token: await newSidToken(env, uid), verified: false });
+    return J({ token: await newSidToken(env, uid, req), verified: false });
   }
   if (req.method === "POST" && path === "/v1/id/login") {
     const { email: raw, password } = await req.json();
@@ -181,7 +225,8 @@ async function sonoraId(req, env, path) {
       ]);
       await issueCode(env, u.user_id, email).catch(() => false);
     }
-    return J({ token: await newSidToken(env, u.user_id), verified: await isVerified(env, u.user_id) });
+    await notifyNewLogin(env, req, u.user_id, email);
+    return J({ token: await newSidToken(env, u.user_id, req), verified: await isVerified(env, u.user_id) });
   }
   const uid = await sidFrom(req, env);
   if (!uid) return err("Non autorizzato", 401);
@@ -229,9 +274,92 @@ async function sonoraId(req, env, path) {
     const rows = await env.DB.prepare("SELECT track_id,title,artist,thumb,dur FROM sid_likes WHERE user_id=? ORDER BY ts DESC LIMIT 5000").bind(uid).all();
     return J({ likes: rows.results.map((r) => ({ id: r.track_id, title: r.title, artist: r.artist, thumb: r.thumb, dur: r.dur })) });
   }
+  if (req.method === "GET" && path === "/v1/id/devices") {
+    const m = (req.headers.get("authorization") || "").match(/^Bearer (.+)$/);
+    const cur = await sha(m[1]);
+    const rows = await env.DB.prepare("SELECT d.token_hash,d.name,d.place,d.ip_mask,d.created,d.last FROM sid_dev d JOIN sid_tokens t ON t.token_hash=d.token_hash WHERE d.user_id=? ORDER BY d.last DESC LIMIT 30").bind(uid).all();
+    await env.DB.prepare("UPDATE sid_dev SET last=? WHERE token_hash=?").bind(Date.now(), cur).run();
+    return J({ items: rows.results.map((r) => ({ id: r.token_hash.slice(0, 16), name: r.name, place: r.place, ip: r.ip_mask, created: r.created, last: r.last, current: r.token_hash === cur })) });
+  }
+  if (req.method === "POST" && path === "/v1/id/devices/revoke") {
+    const b = await req.json();
+    if (await tooMany(env, "pwchk:" + uid, 8)) return err("Troppi tentativi, riprova più tardi", 429);
+    if (!(await passwordOk(env, uid, b.password))) return err("Password non corretta", 403);
+    const m = (req.headers.get("authorization") || "").match(/^Bearer (.+)$/);
+    const cur = await sha(m[1]);
+    if (b.all === true) {
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM sid_dev WHERE user_id=? AND token_hash<>?").bind(uid, cur),
+        env.DB.prepare("DELETE FROM sid_tokens WHERE user_id=? AND token_hash<>?").bind(uid, cur),
+      ]);
+      return J({ ok: true });
+    }
+    if (!/^[a-f0-9]{16}$/.test(String(b.id))) return err("Dispositivo non valido");
+    const t = await env.DB.prepare("SELECT token_hash FROM sid_tokens WHERE user_id=? AND token_hash LIKE ?").bind(uid, b.id + "%").first();
+    if (t && t.token_hash !== cur) {
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM sid_tokens WHERE token_hash=?").bind(t.token_hash),
+        env.DB.prepare("DELETE FROM sid_dev WHERE token_hash=?").bind(t.token_hash),
+      ]);
+    }
+    return J({ ok: true });
+  }
+  if (req.method === "POST" && path === "/v1/id/password") {
+    const b = await req.json();
+    if (await tooMany(env, "pwchk:" + uid, 8)) return err("Troppi tentativi, riprova più tardi", 429);
+    if (!(await passwordOk(env, uid, b.old))) return err("Password attuale non corretta", 403);
+    if (typeof b.new !== "string" || b.new.length < 8 || b.new.length > 200) return err("La nuova password deve avere almeno 8 caratteri");
+    const m = (req.headers.get("authorization") || "").match(/^Bearer (.+)$/);
+    const cur = await sha(m[1]);
+    const salt = rnd(16);
+    await env.DB.batch([
+      env.DB.prepare("UPDATE sid_users SET salt=?, pw_hash=? WHERE user_id=?").bind(salt, await pbkdf2(b.new, salt), uid),
+      env.DB.prepare("DELETE FROM sid_tokens WHERE user_id=? AND token_hash<>?").bind(uid, cur),
+      env.DB.prepare("DELETE FROM sid_dev WHERE user_id=? AND token_hash<>?").bind(uid, cur),
+    ]);
+    const mm = await env.DB.prepare("SELECT email_enc FROM sid_mail WHERE user_id=?").bind(uid).first();
+    if (mm && keyReady(env)) sendMail(env, await unseal(env, mm.email_enc), "La password di Sonora è stata cambiata", "La password del tuo Sonora ID è stata cambiata e gli altri dispositivi sono stati scollegati.\nSe non sei stato tu, contattaci su Telegram: t.me/sonoraclient").catch(() => 0);
+    return J({ ok: true });
+  }
+  if (req.method === "POST" && path === "/v1/id/email/start") {
+    if (!keyReady(env)) return err("Server non configurato", 503);
+    const b = await req.json();
+    if (await tooMany(env, "pwchk:" + uid, 8)) return err("Troppi tentativi, riprova più tardi", 429);
+    if (!(await passwordOk(env, uid, b.password))) return err("Password non corretta", 403);
+    if (!validEmail(b.email)) return err("Email non valida");
+    const email = String(b.email).trim().toLowerCase();
+    const nh = await hmac(env, "sid:" + email);
+    if (await env.DB.prepare("SELECT 1 AS x FROM sid_users WHERE email_hash=?").bind(nh).first()) return err("Questa email è già usata da un altro account");
+    if (await tooMany(env, "emchg:" + uid, 5)) return err("Troppi codici richiesti, riprova più tardi", 429);
+    const code = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
+    await env.DB.prepare("INSERT OR REPLACE INTO sid_mail_chg(user_id,email_enc,new_hash,code_hash,exp,attempts) VALUES(?,?,?,?,?,0)")
+      .bind(uid, await seal(env, email), nh, await sha("chg" + uid + code), Date.now() + 10 * 60000).run();
+    if (!(await sendMail(env, email, "Conferma la nuova email di Sonora", `Il codice per confermare la nuova email del tuo Sonora ID è ${code}. Vale 10 minuti. Se non l'hai richiesto, ignora questa email.`))) return err("Invio email non riuscito: controlla l'indirizzo", 502);
+    return J({ ok: true });
+  }
+  if (req.method === "POST" && path === "/v1/id/email/confirm") {
+    const { code } = await req.json();
+    if (!/^\d{6}$/.test(String(code))) return err("Il codice ha 6 cifre");
+    const c = await env.DB.prepare("SELECT email_enc,new_hash,code_hash,exp,attempts FROM sid_mail_chg WHERE user_id=?").bind(uid).first();
+    if (!c) return err("Nessun cambio email in corso", 404);
+    if (c.exp < Date.now() || c.attempts >= 5) return err("Codice scaduto: ricomincia");
+    if (!sameStr(c.code_hash, await sha("chg" + uid + String(code)))) {
+      await env.DB.prepare("UPDATE sid_mail_chg SET attempts=attempts+1 WHERE user_id=?").bind(uid).run();
+      return err("Codice errato");
+    }
+    const old = await env.DB.prepare("SELECT email_enc FROM sid_mail WHERE user_id=?").bind(uid).first();
+    await env.DB.batch([
+      env.DB.prepare("UPDATE sid_users SET email_hash=? WHERE user_id=?").bind(c.new_hash, uid),
+      env.DB.prepare("INSERT OR REPLACE INTO sid_mail(user_id,email_enc,verified,code_hash,exp,attempts,last_sent) VALUES(?,?,1,'',0,0,0)").bind(uid, c.email_enc),
+      env.DB.prepare("DELETE FROM sid_mail_chg WHERE user_id=?").bind(uid),
+    ]);
+    if (old) sendMail(env, await unseal(env, old.email_enc), "La email di Sonora è stata cambiata", "L'email del tuo Sonora ID è stata cambiata. Se non sei stato tu, contattaci su Telegram: t.me/sonoraclient").catch(() => 0);
+    return J({ ok: true, email: await unseal(env, c.email_enc) });
+  }
   if (req.method === "POST" && path === "/v1/id/logout") {
     const m = (req.headers.get("authorization") || "").match(/^Bearer (.+)$/);
-    await env.DB.prepare("DELETE FROM sid_tokens WHERE token_hash=?").bind(await sha(m[1])).run();
+    const lh = await sha(m[1]);
+    await env.DB.batch([env.DB.prepare("DELETE FROM sid_tokens WHERE token_hash=?").bind(lh), env.DB.prepare("DELETE FROM sid_dev WHERE token_hash=?").bind(lh)]);
     return J({ ok: true });
   }
   if (req.method === "DELETE" && path === "/v1/id") {
@@ -241,6 +369,8 @@ async function sonoraId(req, env, path) {
       env.DB.prepare("DELETE FROM sid_ded WHERE user_id=?").bind(uid),
       env.DB.prepare("DELETE FROM sid_mail WHERE user_id=?").bind(uid),
       env.DB.prepare("DELETE FROM sid_tokens WHERE user_id=?").bind(uid),
+      env.DB.prepare("DELETE FROM sid_dev WHERE user_id=?").bind(uid),
+      env.DB.prepare("DELETE FROM sid_mail_chg WHERE user_id=?").bind(uid),
       env.DB.prepare("DELETE FROM sid_users WHERE user_id=?").bind(uid),
     ]);
     return J({ ok: true });

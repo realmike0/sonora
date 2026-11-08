@@ -179,6 +179,8 @@ fun SonoraRoot(vm: PlayerViewModel) {
             ConsentDialog(onClose = {})
         }
 
+        if (vm.store.onboarded && !splash) FrameworkPrompt()
+
         if (vm.wrappedOpen) WrappedScreen(vm, onClose = { vm.wrappedOpen = false })
 
         SplashOverlay(visible = splash)

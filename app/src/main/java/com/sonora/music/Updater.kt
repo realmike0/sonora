@@ -19,7 +19,7 @@ object Updater {
     data class Release(val tag: String, val name: String, val apkUrl: String, val sizeBytes: Long)
 
     /** Ultima release pubblicata (anche pre-release) che contiene un APK. */
-    suspend fun latest(): Release? = withContext(Dispatchers.IO) {
+    suspend fun latest(prefix: String = "Sonora-v"): Release? = withContext(Dispatchers.IO) {
         val req = Request.Builder()
             .url("https://api.github.com/repos/$REPO/releases?per_page=5")
             .header("Accept", "application/vnd.github+json")
@@ -35,7 +35,7 @@ object Updater {
                 val assets = rel.optJSONArray("assets") ?: continue
                 for (j in 0 until assets.length()) {
                     val a = assets.getJSONObject(j)
-                    if (a.optString("name").endsWith(".apk")) {
+                    if (a.optString("name").let { it.endsWith(".apk") && it.startsWith(prefix) }) {
                         found = Release(
                             tag = rel.optString("tag_name"),
                             name = rel.optString("name").ifBlank { rel.optString("tag_name") },

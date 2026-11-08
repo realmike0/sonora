@@ -90,6 +90,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         AppState.visible = true
+        SonoraId.pull(this)
     }
 
     override fun onStop() {

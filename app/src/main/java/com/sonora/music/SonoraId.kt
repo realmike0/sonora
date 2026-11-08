@@ -35,6 +35,32 @@ object SonoraId {
         email = prefs(c).getString("sid_email", null)
         verified = prefs(c).getBoolean("sid_verified", true)
         if (token == null) email = null
+        pull(c)
+    }
+
+    /**
+     * Se c'è il Framework, è lui a decidere quale account è attivo (puoi cambiarlo da lì).
+     * La prima volta Sonora gli passa l'account che ha già; dopo, se tolgono l'account dal Framework, esce anche Sonora.
+     */
+    fun pull(c: Context) {
+        if (!Framework.installed(c)) return
+        val st = Framework.state(c) ?: return
+        val p = prefs(c)
+        val migrated = p.getBoolean("fw_migrated", false)
+        if (st.email != null && !st.token.isNullOrEmpty()) {
+            p.edit().putBoolean("fw_migrated", true).apply()
+            if (st.email != email || st.token != token || st.verified != verified) {
+                token = st.token
+                email = st.email
+                verified = st.verified
+                p.edit().putString("sid_token", st.token).putString("sid_email", st.email).putBoolean("sid_verified", st.verified).apply()
+            }
+        } else if (token != null && !migrated) {
+            p.edit().putBoolean("fw_migrated", true).apply()
+            Framework.adopt(c, email.orEmpty(), token!!, verified)
+        } else if (token != null && migrated) {
+            clearLocal(c, tellFramework = false)
+        }
     }
 
     private suspend fun call(c: Context, method: String, path: String, body: JSONObject?, auth: Boolean): JSONObject =
@@ -44,6 +70,8 @@ object SonoraId {
             val b = Request.Builder().url(base + path)
                 .method(method, body?.toString()?.toRequestBody("application/json".toMediaType()))
                 .header("User-Agent", "Sonora")
+                .header("x-device-id", Framework.deviceId(c))
+                .header("x-device-name", Framework.deviceName())
             if (auth) b.header("Authorization", "Bearer ${token ?: ""}")
             Http.client.newCall(b.build()).execute().use { r ->
                 val text = r.body?.string().orEmpty()
@@ -69,11 +97,13 @@ object SonoraId {
         email = mail
         verified = r.optBoolean("verified", false)
         prefs(c).edit().putString("sid_token", t).putString("sid_email", mail).putBoolean("sid_verified", verified).remove("sid_removed").apply()
+        Framework.adopt(c, mail, t, verified)
     }
 
     private fun setVerified(c: Context, v: Boolean) {
         verified = v
         prefs(c).edit().putBoolean("sid_verified", v).apply()
+        email?.let { Framework.setVerified(c, it, v) }
     }
 
     /** Controlla sul server se l'email è già verificata (da chiamare quando si apre il Profilo). */
@@ -103,7 +133,8 @@ object SonoraId {
         accept(c, m, r)
     }
 
-    private fun clearLocal(c: Context) {
+    private fun clearLocal(c: Context, tellFramework: Boolean = true) {
+        if (tellFramework) email?.let { Framework.remove(c, it) }
         token = null
         email = null
         verified = true

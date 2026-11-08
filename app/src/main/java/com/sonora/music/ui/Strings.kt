@@ -83,6 +83,12 @@ fun tr(s: String): String {
 }
 
 private val TABLE: Map<String, List<String>> = mapOf(
+    "Installa Sonora Framework" to listOf("Install Sonora Framework", "Instalar Sonora Framework", "Sonora Framework installieren"),
+    "Aggiorna Sonora Framework" to listOf("Update Sonora Framework", "Actualizar Sonora Framework", "Sonora Framework aktualisieren"),
+    "È un'app senza icona che gestisce i tuoi account Sonora: password, dispositivi collegati, email e più account. Android ti chiederà di confermare l'installazione." to listOf("It's an app without an icon that manages your Sonora accounts: password, connected devices, email and multiple accounts. Android will ask you to confirm the installation.", "Es una app sin icono que gestiona tus cuentas de Sonora: contraseña, dispositivos conectados, correo y varias cuentas. Android te pedirá confirmar la instalación.", "Eine App ohne Symbol, die deine Sonora-Konten verwaltet: Passwort, verbundene Geräte, E-Mail und mehrere Konten. Android bittet dich, die Installation zu bestätigen."),
+    "Installa" to listOf("Install", "Instalar", "Installieren"),
+    "Più tardi" to listOf("Later", "Más tarde", "Später"),
+    "Gestisci" to listOf("Manage", "Gestionar", "Verwalten"),
     "Significato" to listOf("Meaning", "Significado", "Bedeutung"),
     "Melodia" to listOf("Melody", "Melodía", "Melodie"),
     "Voti dei brani" to listOf("Track ratings", "Notas de las canciones", "Songbewertungen"),

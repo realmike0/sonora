@@ -15,3 +15,6 @@ CREATE TABLE IF NOT EXISTS sid_ded_meta (ded_id TEXT PRIMARY KEY, user_id TEXT N
 CREATE INDEX IF NOT EXISTS idx_ded_meta_ip ON sid_ded_meta(ip_hash);
 CREATE TABLE IF NOT EXISTS sid_ban (k TEXT PRIMARY KEY, ts INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS sid_tok_meta (token_hash TEXT PRIMARY KEY, created INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS sid_dev (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, dev_id TEXT NOT NULL DEFAULT '', name TEXT, place TEXT, ip_mask TEXT, created INTEGER NOT NULL, last INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_sid_dev_user ON sid_dev(user_id, dev_id);
+CREATE TABLE IF NOT EXISTS sid_mail_chg (user_id TEXT PRIMARY KEY, email_enc TEXT NOT NULL, new_hash TEXT NOT NULL, code_hash TEXT NOT NULL, exp INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0);

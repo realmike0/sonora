@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <Preference android:title="Gestisci account Sonora">
+        <intent
+            android:action="com.sonora.framework.MANAGE"
+            android:targetPackage="com.sonora.framework"
+            android:targetClass="com.sonora.framework.ManageActivity" />
+    </Preference>
+</PreferenceScreen>

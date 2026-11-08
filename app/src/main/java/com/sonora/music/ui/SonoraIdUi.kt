@@ -54,6 +54,13 @@ fun SonoraIdSection(vm: PlayerViewModel) {
             ) { Text(tr("Sincronizza ora")) }
             OutlinedButton(onClick = { scope.launch { SonoraId.logout(context) } }) { Text(tr("Esci")) }
         }
+        if (com.sonora.music.Framework.installed(context)) {
+            Button(onClick = { com.sonora.music.Framework.manage(context) }) { Text(tr("Gestisci")) }
+        } else {
+            OutlinedButton(onClick = {
+                scope.launch { runCatching { com.sonora.music.Framework.installLatest(context) }.onFailure { SonoraId.message = it.message } }
+            }) { Text(tr("Installa Sonora Framework")) }
+        }
         if (!SonoraId.verified) VerifyEmail()
         SonoraId.message?.let {
             Text(tr(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

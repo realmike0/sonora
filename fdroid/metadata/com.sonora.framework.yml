@@ -1,0 +1,14 @@
+Categories:
+  - System
+License: Unknown
+AuthorName: realmike0
+WebSite: https://github.com/realmike0/sonora
+SourceCode: https://github.com/realmike0/sonora
+IssueTracker: https://github.com/realmike0/sonora/issues
+AutoName: Sonora Framework
+Summary: Account manager for Sonora
+Description: |-
+  Sonora Framework is the invisible companion of Sonora (no launcher icon).
+  It manages your Sonora ID accounts: change password, connected devices,
+  change email and multiple accounts, also from Android's account settings.
+  Install it together with Sonora.

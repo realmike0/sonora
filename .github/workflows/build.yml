@@ -25,11 +25,14 @@ jobs:
           V=$(grep -m1 'versionName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
           echo "v=$V" >> "$GITHUB_OUTPUT"
           cp app/build/outputs/apk/release/app-release.apk "Sonora-v$V.apk"
+          cp framework/build/outputs/apk/release/framework-release.apk SonoraFramework.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: Sonora-apk
-          path: Sonora-v${{ steps.ver.outputs.v }}.apk
+          path: |
+            Sonora-v${{ steps.ver.outputs.v }}.apk
+            SonoraFramework.apk
 
       # Pubblica (o aggiorna) la release: l'app la controlla da sola per gli aggiornamenti.
       - uses: softprops/action-gh-release@v2
@@ -39,4 +42,6 @@ jobs:
           name: Sonora ${{ steps.ver.outputs.v }}
           prerelease: true
           body_path: RELEASE_NOTES.md
-          files: Sonora-v${{ steps.ver.outputs.v }}.apk
+          files: |
+            Sonora-v${{ steps.ver.outputs.v }}.apk
+            SonoraFramework.apk

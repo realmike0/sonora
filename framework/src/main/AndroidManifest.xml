@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Solo le app firmate con la stessa chiave (Sonora) possono leggere gli account. -->
+    <permission
+        android:name="com.sonora.framework.permission.ACCOUNTS"
+        android:protectionLevel="signature" />
+
+    <!-- Nessuna activity LAUNCHER: l'app non ha icona nel launcher. -->
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.Framework">
+
+        <activity
+            android:name=".ManageActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="com.sonora.framework.MANAGE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".AuthenticatorService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accounts.AccountAuthenticator" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accounts.AccountAuthenticator"
+                android:resource="@xml/authenticator" />
+        </service>
+
+        <provider
+            android:name=".AccountsProvider"
+            android:authorities="com.sonora.framework.accounts"
+            android:exported="true"
+            android:permission="com.sonora.framework.permission.ACCOUNTS" />
+    </application>
+</manifest>
