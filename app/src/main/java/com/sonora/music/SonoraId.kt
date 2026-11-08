@@ -28,6 +28,8 @@ object SonoraId {
 
     val signedIn: Boolean get() = token != null
 
+    fun authHeader(): String? = token?.let { "Bearer $it" }
+
     fun init(c: Context) {
         token = prefs(c).getString("sid_token", null)
         email = prefs(c).getString("sid_email", null)
@@ -46,6 +48,16 @@ object SonoraId {
             Http.client.newCall(b.build()).execute().use { r ->
                 val text = r.body?.string().orEmpty()
                 val json = runCatching { JSONObject(text) }.getOrDefault(JSONObject())
+                if (auth && r.code == 401) {
+                    // Sessione scaduta o revocata: si esce e si chiede di rientrare.
+                    clearLocal(c)
+                    throw IOException("Sessione scaduta: accedi di nuovo")
+                }
+                if (auth && r.code == 404 && json.optString("error").startsWith("Nessuna verifica")) {
+                    // Account vecchio: il codice parte solo al prossimo accesso.
+                    clearLocal(c)
+                    throw IOException("Esci e rientra con email e password per ricevere il codice")
+                }
                 if (!r.isSuccessful) throw IOException(json.optString("error").ifEmpty { "Errore del server (${r.code})" })
                 json
             }

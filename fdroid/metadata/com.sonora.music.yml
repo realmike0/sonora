@@ -1,0 +1,14 @@
+Categories:
+  - Multimedia
+License: Unknown
+AuthorName: realmike0
+WebSite: https://github.com/realmike0/sonora
+SourceCode: https://github.com/realmike0/sonora
+IssueTracker: https://github.com/realmike0/sonora/issues
+Changelog: https://github.com/realmike0/sonora/releases
+AutoName: Sonora
+Summary: Lettore musicale in stile YouTube Music
+Description: |-
+  Sonora è un client musicale per Android: ricerca, riproduzione in background,
+  testi sincronizzati, widget, Wrapped annuale e Sonora ID per sincronizzare i preferiti.
+  Fa parte della beta: gli aggiornamenti arrivano da questo repository.

@@ -1,4 +1,4 @@
-// Server Wrapped di Sonora (Cloudflare Worker + D1). Segreti: BREVO_KEY, SENDER_EMAIL, TELEGRAM_BOT_TOKEN, AUDD_TOKEN.
+// Server Wrapped di Sonora (Cloudflare Worker + D1). Segreti: BREVO_KEY, SENDER_EMAIL, TELEGRAM_BOT_TOKEN, SERVER_KEY, ADMIN_KEY.
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json" } });
 const err = (m, s = 400) => J({ error: m }, s);
 
@@ -15,6 +15,18 @@ const tgApi = (env, method, body) =>
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
   });
 
+// Id del Wrapped: con SERVER_KEY è un'impronta con chiave (non ricavabile da email/numero); le vecchie passano al primo accesso.
+const wid = async (env, kind, value) => (keyReady(env) ? hmac(env, kind + value) : sha(kind === "tel:" ? "tel:" + value : value));
+async function moveWrappedId(env, oldId, newId) {
+  if (!oldId || oldId === newId) return;
+  if (!(await env.DB.prepare("SELECT 1 FROM users WHERE id=?").bind(oldId).first())) return;
+  if (await env.DB.prepare("SELECT 1 FROM users WHERE id=?").bind(newId).first()) return;
+  await env.DB.batch([
+    env.DB.prepare("UPDATE events SET user_id=? WHERE user_id=?").bind(newId, oldId),
+    env.DB.prepare("UPDATE tokens SET user_id=? WHERE user_id=?").bind(newId, oldId),
+    env.DB.prepare("UPDATE users SET id=? WHERE id=?").bind(newId, oldId),
+  ]);
+}
 async function newToken(env, uid) {
   await env.DB.prepare("INSERT OR IGNORE INTO users(id,created) VALUES(?,?)").bind(uid, Date.now()).run();
   const token = rnd(32);
@@ -90,16 +102,34 @@ async function tooMany(env, key, max) {
   await env.DB.prepare("INSERT INTO rl(k,n) VALUES(?,1) ON CONFLICT(k) DO UPDATE SET n=n+1").bind(k).run();
   return false;
 }
+const SID_TTL = 90 * 86400000; // le sessioni durano 90 giorni
 async function newSidToken(env, uid) {
   const token = rnd(32);
-  await env.DB.prepare("INSERT INTO sid_tokens(token_hash,user_id) VALUES(?,?)").bind(await sha(token), uid).run();
+  const th = await sha(token);
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO sid_tokens(token_hash,user_id) VALUES(?,?)").bind(th, uid),
+    env.DB.prepare("INSERT OR REPLACE INTO sid_tok_meta(token_hash,created) VALUES(?,?)").bind(th, Date.now()),
+  ]);
   return token;
 }
 async function sidFrom(req, env) {
   const m = (req.headers.get("authorization") || "").match(/^Bearer (.+)$/);
   if (!m) return null;
-  const r = await env.DB.prepare("SELECT user_id FROM sid_tokens WHERE token_hash=?").bind(await sha(m[1])).first();
-  return r ? r.user_id : null;
+  const th = await sha(m[1]);
+  const r = await env.DB.prepare("SELECT t.user_id, k.created FROM sid_tokens t LEFT JOIN sid_tok_meta k ON k.token_hash=t.token_hash WHERE t.token_hash=?").bind(th).first();
+  if (!r) return null;
+  const now = Date.now();
+  if (r.created == null) {
+    // Sessioni create prima della scadenza: la durata parte dal primo utilizzo.
+    await env.DB.prepare("INSERT OR IGNORE INTO sid_tok_meta(token_hash,created) VALUES(?,?)").bind(th, now).run();
+  } else if (now - r.created > SID_TTL) {
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM sid_tokens WHERE token_hash=?").bind(th),
+      env.DB.prepare("DELETE FROM sid_tok_meta WHERE token_hash=?").bind(th),
+    ]);
+    return null;
+  }
+  return r.user_id;
 }
 async function sonoraId(req, env, path) {
   const ip = (await sha(req.headers.get("cf-connecting-ip") || "x")).slice(0, 24);
@@ -368,10 +398,10 @@ async function webSearch(req, env, url) {
   return J({ items });
 }
 
-async function askAi(env, system, user) {
+async function askAi(env, system, user, max = 700) {
   const r = await env.AI.run(AI_MODEL, {
     messages: [{ role: "system", content: system }, { role: "user", content: user }],
-    max_tokens: 700,
+    max_tokens: max,
     temperature: 0.4,
   });
   const text = String(r.response || "");
@@ -383,19 +413,37 @@ const cleanList = (a, n, len) => (Array.isArray(a) ? a : []).slice(0, n).map((x)
 async function aiRoutes(req, env, path) {
   if (!env.AI) return err("AI non disponibile", 503);
   const ip = (await sha(req.headers.get("cf-connecting-ip") || "x")).slice(0, 24);
-  if (await tooMany(env, "ai:" + ip, 60)) return err("Troppe richieste, riprova più tardi", 429);
   if (req.method !== "POST") return err("Non trovato", 404);
+  // Limiti: più larghi con un Sonora ID, stretti senza; in più un tetto per tutti, per contenere i costi.
+  const uid = await sidFrom(req, env);
+  if (await tooMany(env, "ai:all", 600)) return err("L'AI è molto richiesta, riprova più tardi", 429);
+  if (uid ? await tooMany(env, "aiu:" + uid, 60) : await tooMany(env, "ai:" + ip, 12)) return err("Troppe richieste, riprova più tardi", 429);
   const b = await req.json();
   const lang = { it: "italiano", en: "inglese", es: "spagnolo", de: "tedesco", tr: "turco", sq: "albanese", fr: "francese" }[b.lang] || "italiano";
   try {
     if (path === "/v1/ai/rate") {
-      const what = b.kind === "album" ? `l'album "${String(b.name).slice(0, 120)}" di ${String(b.artist || "").slice(0, 120)}` : `l'artista ${String(b.name).slice(0, 120)}`;
-      const tracks = cleanList(b.tracks, 25, 100).join("; ");
+      const isAlbum = b.kind === "album";
+      const what = isAlbum ? `l'album "${String(b.name).slice(0, 120)}" di ${String(b.artist || "").slice(0, 120)}` : `l'artista ${String(b.name).slice(0, 120)}`;
+      const list = cleanList(b.tracks, 25, 100);
+      const n = list.length;
+      const numbered = list.map((t, i) => `${i}. ${t}`).join("\n");
+      const shape = isAlbum
+        ? `{"voto": 1-10 con un decimale, "significato": 1-10, "melodia": 1-10, "flow": 1-10, "sintesi": frase di massimo 18 parole, "brani": [{"n": numero del brano, "voto": 1-10 con un decimale}] con TUTTI i ${n} brani}`
+        : `{"voto": 1-10 con un decimale, "significato": 1-10, "melodia": 1-10, "flow": 1-10, "sintesi": frase di massimo 18 parole}`;
       const o = await askAi(env,
         "Sei un critico musicale esperto e onesto. Giudichi il significato dei testi, la melodia e il flow. Se non conosci bene l'opera, dai un voto prudente. Rispondi SOLO con un oggetto JSON.",
-        `Valuta ${what}. Brani: ${tracks || "non disponibili"}.\nRispondi in ${lang} con JSON: {"voto": numero da 1 a 10 con un decimale, "sintesi": frase di massimo 18 parole}`);
-      const voto = Math.min(10, Math.max(1, Number(o.voto) || 0));
-      return J({ score: Math.round(voto * 10) / 10, verdict: String(o.sintesi || "").slice(0, 200) });
+        `Valuta ${what}.${n ? ` Brani:\n${numbered}` : ""}\nRispondi in ${lang} con JSON: ${shape}`, 1400);
+      const clamp = (x) => Math.round(Math.min(10, Math.max(1, Number(x) || 0)) * 10) / 10;
+      const out = { score: clamp(o.voto), meaning: clamp(o.significato || o.voto), melody: clamp(o.melodia || o.voto), flow: clamp(o.flow || o.voto), verdict: String(o.sintesi || "").slice(0, 200) };
+      if (isAlbum) {
+        const per = new Array(n).fill(0);
+        for (const x of Array.isArray(o.brani) ? o.brani : []) {
+          const i = Number(x && x.n);
+          if (Number.isInteger(i) && i >= 0 && i < n && Number(x.voto) > 0) per[i] = clamp(x.voto);
+        }
+        out.tracks = per;
+      }
+      return J(out);
     }
     if (path === "/v1/ai/picks") {
       const hist = cleanList(b.history, 40, 120).join("\n");
@@ -442,7 +490,9 @@ async function telegramUpdate(env, u) {
     if (m.contact.user_id !== m.from.id) return say("Condividi il TUO numero con il pulsante, non un altro contatto.");
     const sess = await env.DB.prepare("SELECT sid_hash FROM tg_sessions WHERE user_id=? AND exp>?").bind("pending:" + chat, Date.now()).first();
     if (!sess) return say("Nessuna richiesta attiva. Apri Sonora e scegli \"Verifica con Telegram\".");
-    const uid = await sha("tel:" + String(m.contact.phone_number).replace(/\D/g, ""));
+    const digits = String(m.contact.phone_number).replace(/\D/g, "");
+    const uid = await wid(env, "tel:", digits);
+    if (keyReady(env)) await moveWrappedId(env, await sha("tel:" + digits), uid);
     const token = await newToken(env, uid);
     await env.DB.prepare("UPDATE tg_sessions SET user_id=?, token=? WHERE sid_hash=?").bind(uid, token, sess.sid_hash).run();
     return say("Fatto! Torna su Sonora.", { reply_markup: { remove_keyboard: true } });
@@ -475,7 +525,7 @@ export default {
         const { email: raw } = await req.json();
         if (!validEmail(raw)) return err("Email non valida");
         const email = raw.trim().toLowerCase();
-        const eh = await sha(email);
+        const eh = await wid(env, "wr:", email);
         const now = Date.now();
         const cip = (await sha(req.headers.get("cf-connecting-ip") || "x")).slice(0, 24);
         if (await tooMany(env, "code:" + cip, 8)) return err("Troppe richieste, riprova più tardi", 429);
@@ -502,7 +552,8 @@ export default {
       if (req.method === "POST" && path === "/v1/verify") {
         const { email: raw, code } = await req.json();
         if (!validEmail(raw) || !/^\d{6}$/.test(String(code))) return err("Dati non validi");
-        const eh = await sha(raw.trim().toLowerCase());
+        const mail = raw.trim().toLowerCase();
+        const eh = await wid(env, "wr:", mail);
         const row = await env.DB.prepare("SELECT * FROM codes WHERE email_hash=?").bind(eh).first();
         if (!row || row.exp < Date.now() || row.attempts >= 5) return err("Codice scaduto: chiedine uno nuovo", 400);
         if (row.code_hash !== (await sha(eh + String(code)))) {
@@ -510,6 +561,7 @@ export default {
           return err("Codice errato");
         }
         await env.DB.prepare("DELETE FROM codes WHERE email_hash=?").bind(eh).run();
+        if (keyReady(env)) await moveWrappedId(env, await sha(mail), eh);
         await env.DB.prepare("INSERT OR IGNORE INTO users(id,created) VALUES(?,?)").bind(eh, Date.now()).run();
         const token = rnd(32);
         await env.DB.prepare("INSERT INTO tokens(token_hash,user_id) VALUES(?,?)").bind(await sha(token), eh).run();
@@ -526,25 +578,6 @@ export default {
         if (req.headers.get("x-telegram-bot-api-secret-token") !== (await sha(env.TELEGRAM_BOT_TOKEN || "")).slice(0, 32)) return err("Non autorizzato", 401);
         await telegramUpdate(env, await req.json());
         return J({ ok: true });
-      }
-
-      if (req.method === "POST" && path === "/v1/recognize") {
-        if (!env.AUDD_TOKEN || env.AUDD_TOKEN === "none") return err("Riconoscimento non configurato", 503);
-        const ip = req.headers.get("cf-connecting-ip") || "x";
-        const day = Math.floor(Date.now() / 86400000);
-        const key = (await sha(ip)).slice(0, 24) + ":" + day;
-        const row = await env.DB.prepare("SELECT n FROM rl WHERE k=?").bind(key).first();
-        if (row && row.n >= 15) return err("Limite giornaliero raggiunto, riprova domani", 429);
-        await env.DB.prepare("INSERT INTO rl(k,n) VALUES(?,1) ON CONFLICT(k) DO UPDATE SET n=n+1").bind(key).run();
-        const buf = await req.arrayBuffer();
-        if (buf.byteLength < 1000 || buf.byteLength > 2000000) return err("Audio non valido");
-        const fd = new FormData();
-        fd.append("api_token", env.AUDD_TOKEN);
-        fd.append("file", new Blob([buf], { type: "audio/wav" }), "a.wav");
-        const r = await fetch("https://api.audd.io/", { method: "POST", body: fd });
-        const j = await r.json().catch(() => ({}));
-        if (j && j.result && j.result.title) return J({ found: true, title: j.result.title, artist: j.result.artist || "" });
-        return J({ found: false });
       }
 
       if (req.method === "POST" && path === "/v1/tg/start") {

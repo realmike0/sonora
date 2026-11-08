@@ -58,7 +58,6 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     var translating by mutableStateOf(false)
     var translateFailed by mutableStateOf(false)
     private var translateJob: Job? = null
-    var recognizeOpen by mutableStateOf(false)
 
     /** Coda di riproduzione. */
     var queue by mutableStateOf<List<Track>>(emptyList())

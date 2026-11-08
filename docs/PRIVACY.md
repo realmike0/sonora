@@ -22,6 +22,7 @@ Se crei un Sonora ID (email e password) per sincronizzare i brani preferiti tra 
 - **Email:** salvata cifrata (AES-GCM, chiave solo sul server) per verificarla con un codice a 6 cifre e per il recupero dell'account; per riconoscerla usiamo anche un'impronta (HMAC). Non è mai visibile in chiaro nei log né agli amministratori.
 - **Password:** viene salvata solo in forma protetta (PBKDF2-SHA256 con sale casuale), mai in chiaro.
 - **Preferiti:** per ogni brano piaciuto salviamo identificativo, titolo, artista, copertina e durata, così si sincronizzano tra i tuoi dispositivi.
+- **Sessioni:** l'accesso dura 90 giorni, poi va rifatto.
 - **Accessi:** i tentativi di accesso sono limitati per proteggere l'account; usiamo l'indirizzo IP solo in forma di impronta per questo limite.
 - **Cancellazione:** da Impostazioni → Profilo → Elimina Sonora ID cancelli subito dal server account, sessioni e preferiti. Sul telefono resta tutto.
 - Il Sonora ID è separato dal tracciamento del Wrapped: puoi usare l'uno senza l'altro.
@@ -42,3 +43,5 @@ Apri una issue sul repository GitHub di Sonora.
 Se pubblichi una dedica, il brano, il destinatario, il messaggio e il nome che scegli sono visibili a tutti gli utenti con un Sonora ID. Puoi eliminarla in qualsiasi momento; le dediche segnalate da 3 utenti vengono nascoste e quelle di un account eliminato vengono cancellate.
 
 **Anti-spam:** quando scrivi una dedica conserviamo per 30 giorni l'impronta (HMAC, non l'indirizzo) del tuo IP. Serve solo a cancellare dediche di spam e a bloccare chi le invia; poi viene eliminata. Per scrivere dediche l'email deve essere verificata.
+
+L'identificativo del Wrapped (email o numero di telefono) è un'impronta con chiave segreta del server: non si può ricavare l'email o il numero da quello che è salvato.

@@ -1,0 +1,62 @@
+name: Sonora Pages (player web + repository F-Droid)
+# Un solo sito su GitHub Pages: / = player web, /fdroid/repo = repository F-Droid.
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", "fdroid/**"]
+  workflow_run:
+    workflows: ["Build APK"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  pages: write
+  id-token: write
+  contents: read
+  actions: read
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: ${{ (vars.DEPLOY_WEB == 'true' || vars.DEPLOY_FDROID == 'true' || github.event_name == 'workflow_dispatch') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.d.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sito
+        run: |
+          mkdir -p _site
+          cp -r web/. _site/
+      - name: Repository F-Droid
+        if: ${{ vars.DEPLOY_FDROID == 'true' || github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FDROID_KEYSTORE_B64: ${{ secrets.FDROID_KEYSTORE_B64 }}
+          FDROID_KEYPASS: ${{ secrets.FDROID_KEYPASS }}
+        run: |
+          set -e
+          OWNER=${GITHUB_REPOSITORY%%/*}; NAME=${GITHUB_REPOSITORY##*/}
+          export REPO_URL="https://${OWNER}.github.io/${NAME}/fdroid/repo"
+          pip install --quiet fdroidserver
+          mkdir -p fdroid/repo
+          # ultime 3 release: ogni APK resta installabile dal catalogo
+          for T in $(gh release list --limit 3 --json tagName -q '.[].tagName'); do
+            gh release download "$T" -p '*.apk' -D fdroid/repo --clobber || true
+          done
+          ls fdroid/repo
+          bash fdroid/build.sh | tee fp.txt
+          mkdir -p _site/fdroid
+          cp -r fdroid/repo _site/fdroid/repo
+          FP=$(sed -n 's/^Impronta del repository: //p' fp.txt)
+          {
+            echo "### Repository F-Droid"
+            echo "Link da aggiungere in F-Droid: \`${REPO_URL}?fingerprint=${FP}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: d
+        uses: actions/deploy-pages@v4

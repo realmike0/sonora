@@ -18,7 +18,20 @@ import java.util.Locale
 
 /** Funzioni AI di Sonora: il server le chiede a Cloudflare Workers AI (nessuna chiave sul telefono). */
 object Ai {
-    data class Rating(val score: Double, val verdict: String)
+    data class Rating(
+        val score: Double, val verdict: String,
+        val meaning: Double = 0.0, val melody: Double = 0.0, val flow: Double = 0.0,
+        val tracks: List<Double> = emptyList()
+    )
+
+    private fun parse(o: JSONObject): Rating {
+        val arr = o.optJSONArray("tracks")
+        return Rating(
+            o.optDouble("score", 0.0), o.optString("verdict"),
+            o.optDouble("meaning", 0.0), o.optDouble("melody", 0.0), o.optDouble("flow", 0.0),
+            arr?.let { a -> (0 until a.length()).map { a.optDouble(it, 0.0) } } ?: emptyList()
+        )
+    }
 
     private fun prefs(c: Context) = c.getSharedPreferences("sonora", Context.MODE_PRIVATE)
 
@@ -28,7 +41,8 @@ object Ai {
         body.put("lang", com.sonora.music.ui.Lang.effective())
         val req = Request.Builder().url(base + path)
             .post(body.toString().toRequestBody("application/json".toMediaType()))
-            .header("User-Agent", "Sonora").build()
+            .header("User-Agent", "Sonora")
+            .apply { SonoraId.authHeader()?.let { header("Authorization", it) } }.build()
         Http.client.newBuilder().callTimeout(40, java.util.concurrent.TimeUnit.SECONDS).build().newCall(req).execute().use { r ->
             val text = r.body?.string().orEmpty()
             val json = runCatching { JSONObject(text) }.getOrDefault(JSONObject())
@@ -40,16 +54,16 @@ object Ai {
     /** Voto e giudizio di un album o di un artista. Il risultato si ricorda sul telefono. */
     suspend fun rate(c: Context, kind: String, name: String, artist: String, tracks: List<String>): Rating {
         val lang = com.sonora.music.ui.Lang.effective()
-        val key = "ai_rate_${kind}_${lang}_${name.lowercase()}_${artist.lowercase()}".take(120)
+        val key = "ai_rate2_${kind}_${lang}_${name.lowercase()}_${artist.lowercase()}".take(120)
         prefs(c).getString(key, null)?.let { s ->
-            runCatching { JSONObject(s) }.getOrNull()?.let { return Rating(it.getDouble("s"), it.getString("v")) }
+            runCatching { JSONObject(s) }.getOrNull()?.let { return parse(it) }
         }
         val r = call(
             c, "/v1/ai/rate",
             JSONObject().put("kind", kind).put("name", name).put("artist", artist).put("tracks", JSONArray(tracks.take(25)))
         )
-        val rating = Rating(r.optDouble("score", 0.0), r.optString("verdict"))
-        if (rating.score > 0) prefs(c).edit().putString(key, JSONObject().put("s", rating.score).put("v", rating.verdict).toString()).apply()
+        val rating = parse(r)
+        if (rating.score > 0) prefs(c).edit().putString(key, r.toString()).apply()
         return rating
     }
 

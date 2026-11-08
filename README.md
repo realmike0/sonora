@@ -47,7 +47,7 @@ Sonora è un'app Android per ascoltare musica da YouTube Music **con i colori de
 
 - **Testi da 5 fonti** (LRCLIB, BetterLyrics, Unison, LyricsPlus, KuGou) con scelta automatica del testo migliore · **immagine dai testi** da condividere · feedback aptico al tocco · Wrapped di tutti gli anni
 
-- **0.60:** gesto indietro predittivo · equalizzatore · riconoscimento brani (microfono) · interruttore audio/video originale · sovrapposizione vera tra i brani
+- **0.60:** gesto indietro predittivo · equalizzatore · interruttore audio/video originale · sovrapposizione vera tra i brani
 - **0.60.1:** nuovo player a schermo intero (barra a onda, controlli a pillola, casuale) · schermata testi con controlli animati · rimosso l'accesso alle notifiche (blocco Play Protect)
 - **0.60.2:** impostazioni più pulite (profilo con account Google, niente descrizioni) · Wrapped visibile a dicembre · APK firmato come release
 - **0.70:** Esplora (statistiche settimanali) · generi con playlist nella ricerca · playlist in stile album · lingue Italiano/English/Español/Deutsch · traduzione dei testi · notifica del Wrapped il 10 dicembre
@@ -106,3 +106,6 @@ Sonora non è affiliata a YouTube, Google o YouTube Music. L'importazione delle 
 *Made with ❤️ by [realmike0](https://www.github.com/realmike0) on GitHub*
 
 </div>
+
+## Installare con F-Droid
+Aggiungi il repository di Sonora in F-Droid (Impostazioni → Repository → +) con il link che trovi nel riepilogo dell'ultima esecuzione di "Sonora Pages" su GitHub Actions.

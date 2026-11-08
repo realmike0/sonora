@@ -83,6 +83,9 @@ fun tr(s: String): String {
 }
 
 private val TABLE: Map<String, List<String>> = mapOf(
+    "Significato" to listOf("Meaning", "Significado", "Bedeutung"),
+    "Melodia" to listOf("Melody", "Melodía", "Melodie"),
+    "Voti dei brani" to listOf("Track ratings", "Notas de las canciones", "Songbewertungen"),
     "Verifica la tua email" to listOf("Verify your email", "Verifica tu correo", "Bestätige deine E-Mail"),
     "Ti abbiamo mandato un codice a 6 cifre. Serve per scrivere dediche." to listOf("We sent you a 6-digit code. It is needed to write dedications.", "Te enviamos un código de 6 dígitos. Es necesario para escribir dedicatorias.", "Wir haben dir einen 6-stelligen Code geschickt. Er wird zum Schreiben von Widmungen benötigt."),
     "Codice a 6 cifre" to listOf("6-digit code", "Código de 6 dígitos", "6-stelliger Code"),

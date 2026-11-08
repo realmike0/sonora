@@ -278,7 +278,6 @@ fun SonoraScreen(vm: PlayerViewModel) {
     if (vm.commentsOpen) CommentsSheet(vm, onDismiss = { vm.commentsOpen = false })
     if (vm.dedOpen) DedicationsSheet(vm, onDismiss = { vm.dedOpen = false })
     vm.dedicateTrack?.let { DedicateSheet(vm, it, onDismiss = { vm.dedicateTrack = null }) }
-    if (vm.recognizeOpen) RecognizeSheet(vm, onDismiss = { vm.recognizeOpen = false })
 
     // Dispositivo audio collegato: modello 3D + "Inizia ad ascoltare".
     DeviceSheet(vm)
@@ -435,9 +434,6 @@ private fun SearchField(vm: PlayerViewModel) {
                         }
                     }) {
                         Icon(Icons.Rounded.Mic, contentDescription = tr("Ricerca vocale"))
-                    }
-                    IconButton(onClick = { vm.recognizeOpen = true }) {
-                        Icon(Icons.Rounded.GraphicEq, contentDescription = tr("Riconosci brano"))
                     }
                 }
             }
