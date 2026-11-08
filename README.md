@@ -9,8 +9,8 @@ Plays in the background, saves songs offline and the lyrics go in time 🎤
 ![Version](https://img.shields.io/badge/version-0.80--beta-6750A4)
 ![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
 
-<a href="https://realmike0.github.io/sonora/fdroid/repo?fingerprint=4a115e0bb40a50703b340576aec565974830ec478c5cb7b5b6044da8a1c2cd8a"><img src="https://f-droid.org/badge/get-it-on.png" alt="Get it on F-Droid" height="80"></a>
-<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/realmike0/sonora"><img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="80"></a>
+<a href="https://realmike0.github.io/sonora/fdroid/"><img src="https://f-droid.org/badge/get-it-on.png" alt="Get it on F-Droid" height="80"></a>
+<a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/realmike0/sonora"><img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="80"></a>
 
 [⬇️ **Download the APK**](https://github.com/realmike0/sonora/releases) · [💬 **Telegram channel**](https://t.me/sonoraclient)
 
