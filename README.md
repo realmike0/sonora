@@ -39,6 +39,21 @@ Sonora è un'app Android per ascoltare musica da YouTube Music **con i colori de
 - 📱 **Tablet** in orizzontale: interfaccia a due pannelli. **Telefono** in orizzontale: modalità AOD con ora, notifiche e brano.
 - ℹ️ **Menu del brano** (pressione prolungata): durata, data di pubblicazione, aggiungi ai preferiti o a una playlist, scarica.
 
+## 🆕 Novità della 0.50
+
+- **Wrapped** di ogni anno (locale, oppure con server se accetti il tracciamento) · coda di riproduzione · pillola del volume con riconoscimento del dispositivo (cuffie, speaker, auto) e vibrazione leggera
+- **Widget**: ascolti e in riproduzione, attività recente, scorciatoia all'artista che scegli
+- Qualità audio (M4A/WebM × alta/media/bassa) · dissolvenza avanzata · pagina artista ridisegnata · grafica leggera automatica sui dispositivi datati
+
+- **Testi da 5 fonti** (LRCLIB, BetterLyrics, Unison, LyricsPlus, KuGou) con scelta automatica del testo migliore · **immagine dai testi** da condividere · feedback aptico al tocco · Wrapped di tutti gli anni
+
+- **0.60:** gesto indietro predittivo · equalizzatore · riconoscimento brani (microfono) · interruttore audio/video originale · sovrapposizione vera tra i brani
+- **0.60.1:** nuovo player a schermo intero (barra a onda, controlli a pillola, casuale) · schermata testi con controlli animati · rimosso l'accesso alle notifiche (blocco Play Protect)
+- **0.60.2:** impostazioni più pulite (profilo con account Google, niente descrizioni) · Wrapped visibile a dicembre · APK firmato come release
+- **0.70:** Esplora (statistiche settimanali) · generi con playlist nella ricerca · playlist in stile album · lingue Italiano/English/Español/Deutsch · traduzione dei testi · notifica del Wrapped il 10 dicembre
+- **0.80:** AI (voto ad artisti e album, scelte del giorno, mix della coda) · ricerca vocale · francese, turco, albanese · widget rinnovati · haptics audio · cambio dispositivo di uscita · dediche con il cuore · Sonora Web, player indipendente nella cartella web/ (anche per Android < 8)
+- **0.71:** stili grafici (Material 3 Expressive, Material You, Liquid Glass, Miuix) · Sonora ID (email e password, preferiti sincronizzati) · commenti di YouTube Music · pagine playlist in stile artista · menu a pressione lunga in Raccolta
+
 ## 🔒 Privacy e Wrapped
 
 Il tracciamento è **facoltativo**: dopo l'onboarding ti viene chiesto e se rifiuti nulla lascia il telefono. Se accetti, verifichi chi sei con Telegram (numero) o con un codice via email e solo da quel momento i tuoi ascolti vanno al server per il Wrapped. Puoi spegnere o cancellare tutto dalle Impostazioni. Dettagli in [docs/PRIVACY.md](docs/PRIVACY.md); guida al server in [server/README.md](server/README.md).
