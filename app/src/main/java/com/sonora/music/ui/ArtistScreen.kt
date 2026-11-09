@@ -24,6 +24,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
@@ -258,6 +261,14 @@ private fun ArtistContent(
                         Icon(Icons.Rounded.PlayArrow, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                         Text(tr("RIPRODUCI"), fontWeight = FontWeight.ExtraBold)
+                    }
+                    val fav = vm.store.isFavArtist(page.name)
+                    RoundBtn({ vm.store.toggleFavArtist(page.name) }, 60.dp) {
+                        Icon(
+                            if (fav) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                            contentDescription = tr("Artista preferito"),
+                            tint = if (fav) accent else LocalContentColor.current
+                        )
                     }
                     Box {
                         RoundBtn({ menu = true }, 60.dp) { Icon(Icons.Rounded.MoreVert, contentDescription = tr("Opzioni")) }

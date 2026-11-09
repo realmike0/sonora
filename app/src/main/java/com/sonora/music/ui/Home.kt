@@ -98,6 +98,8 @@ fun HomeScreen(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit.Dp, modi
                 PicksGrid(vm, home.picks)
             }
 
+            item(key = "upcoming") { UpcomingShelf() }
+
             item(key = "picks-play") {
                 FilledTonalButton(
                     onClick = { vm.play(home.picks, 0) },

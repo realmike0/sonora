@@ -434,6 +434,59 @@ async function dedRoutes(req, env, path) {
 }
 
 
+// ───────── Commenti Sonora (con Sonora ID, moderati dall'AI) + album in attesa ─────────
+const MOD_SYSTEM = "Sei un moderatore di commenti sotto le canzoni. Rispondi SOLO con JSON {\"ok\":true} oppure {\"ok\":false,\"why\":\"motivo breve\"}. Rifiuta: insulti e offese, odio o discriminazione, minacce, molestie, contenuti sessuali espliciti, spam, pubblicità, link o contatti. Accetta opinioni sulla musica, anche critiche educate, e frasi in qualunque lingua.";
+async function moderate(env, text) {
+  if (!env.AI) return { ok: true };
+  try {
+    const r = await askAi(env, MOD_SYSTEM, "Commento: " + JSON.stringify(text), 60);
+    return { ok: r.ok !== false, why: clean(r.why, 80) };
+  } catch (e) {
+    return { ok: true }; // se l'AI non risponde, restano i filtri semplici e le segnalazioni
+  }
+}
+async function commentRoutes(req, env, path, url) {
+  if (req.method === "GET" && path === "/v1/comments") {
+    const track = clean(url.searchParams.get("track"), 20);
+    if (!/^[\w-]{11}$/.test(track)) return J({ items: [] });
+    const rows = await env.DB.prepare("SELECT id,user_id,name,text,ts FROM sid_comments WHERE track_id=? AND hidden=0 ORDER BY ts DESC LIMIT 80").bind(track).all();
+    const uid = await sidFrom(req, env);
+    return J({ items: rows.results.map((r) => ({ id: r.id, name: r.name, text: r.text, ts: r.ts, mine: !!uid && r.user_id === uid })) });
+  }
+  const uid = await sidFrom(req, env);
+  if (!uid) return err("Accedi con Sonora ID", 401);
+  if (req.method === "POST" && path === "/v1/id/comments") {
+    if (!(await isVerified(env, uid))) return err("Verifica la tua email per commentare", 403);
+    const iph = keyReady(env) ? await hmac(env, "ip:" + (req.headers.get("cf-connecting-ip") || "x")) : "";
+    if ((await isBanned(env, "user:" + uid)) || (await isBanned(env, "ip:" + iph))) return err("Non puoi commentare", 403);
+    if (await tooMany(env, "com:" + uid, 20)) return err("Troppi commenti, riprova più tardi", 429);
+    const b = await req.json();
+    const track = clean(b.track, 20), name = clean(b.name, 24) || "Anonimo", text = clean(b.text, 280);
+    if (!/^[\w-]{11}$/.test(track) || text.length < 2) return err("Scrivi un commento");
+    if (BAD_MSG.test([text, name].join(" ").normalize("NFKC"))) return err("Link e contatti non sono ammessi");
+    const mod = await moderate(env, text);
+    if (!mod.ok) return err("Commento non pubblicato: " + (mod.why || "non rispetta le regole della community"), 422);
+    const id = rnd(8);
+    await env.DB.prepare("INSERT INTO sid_comments(id,track_id,user_id,name,text,ts) VALUES(?,?,?,?,?,?)").bind(id, track, uid, name, text, Date.now()).run();
+    return J({ ok: true, id });
+  }
+  const m = path.match(/^\/v1\/id\/comments\/([a-f0-9]{16})(\/report)?$/);
+  if (m) {
+    if (req.method === "DELETE" && !m[2]) {
+      await env.DB.prepare("DELETE FROM sid_comments WHERE id=? AND user_id=?").bind(m[1], uid).run();
+      return J({ ok: true });
+    }
+    if (req.method === "POST" && m[2]) {
+      await env.DB.prepare("INSERT OR IGNORE INTO sid_comm_reports(comment_id,user_id) VALUES(?,?)").bind(m[1], uid).run();
+      const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM sid_comm_reports WHERE comment_id=?").bind(m[1]).first();
+      if (n && n.n >= 3) await env.DB.prepare("UPDATE sid_comments SET hidden=1 WHERE id=?").bind(m[1]).run();
+      return J({ ok: true });
+    }
+  }
+  return err("Non trovato", 404);
+}
+
+
 // ───────── Amministrazione (chiave ADMIN_KEY): elenco dediche, pulizia spam per IP/utente, ban ─────────
 async function adminRoutes(req, env, path, url) {
   const k = req.headers.get("x-admin-key") || "";
@@ -477,6 +530,15 @@ async function adminRoutes(req, env, path, url) {
       for (const key of keys) { await env.DB.prepare("INSERT OR IGNORE INTO sid_ban(k,ts) VALUES(?,?)").bind(key, Date.now()).run(); banned++; }
     }
     return J({ deleted: list.length, banned });
+  }
+  if (req.method === "POST" && path === "/v1/admin/upcoming") {
+    const b = await req.json();
+    if (typeof b.remove === "string") { await env.DB.prepare("DELETE FROM sid_upcoming WHERE id=?").bind(b.remove).run(); return J({ ok: true }); }
+    const artist = clean(b.artist, 80), album = clean(b.album, 100), cover = clean(b.cover, 300), release = Number(b.release);
+    if (!artist || !album || !Number.isFinite(release)) return err("Servono artista, album e data");
+    const id = rnd(6);
+    await env.DB.prepare("INSERT INTO sid_upcoming(id,artist,album,cover,release_ts) VALUES(?,?,?,?,?)").bind(id, artist, album, cover, release).run();
+    return J({ ok: true, id });
   }
   if (req.method === "POST" && path === "/v1/admin/unban") {
     const b = await req.json();
@@ -730,6 +792,11 @@ export default {
 
       if (req.method === "GET" && path === "/v1/web/search") return await webSearch(req, env, url);
       if (path.startsWith("/v1/admin/")) return await adminRoutes(req, env, path, url);
+      if (req.method === "GET" && path === "/v1/upcoming") {
+        const rows = await env.DB.prepare("SELECT id,artist,album,cover,release_ts FROM sid_upcoming WHERE release_ts>? ORDER BY release_ts ASC LIMIT 30").bind(Date.now()).all();
+        return J({ items: rows.results.map((r) => ({ id: r.id, artist: r.artist, album: r.album, cover: r.cover, release: r.release_ts })) });
+      }
+      if (path === "/v1/comments" || path.startsWith("/v1/id/comments")) return await commentRoutes(req, env, path, url);
       if (path.startsWith("/v1/id/ded")) return await dedRoutes(req, env, path);
       if (path.startsWith("/v1/id")) return await sonoraId(req, env, path);
       if (path.startsWith("/v1/ai/")) return await aiRoutes(req, env, path);

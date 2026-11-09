@@ -77,6 +77,15 @@ class Store(context: Context) {
 
     val liked = mutableStateListOf<Track>()
 
+    /** Artisti preferiti (solo sul telefono). */
+    val favArtists = mutableStateListOf<String>()
+    fun isFavArtist(name: String) = favArtists.any { it.equals(name, ignoreCase = true) }
+    fun toggleFavArtist(name: String) {
+        val i = favArtists.indexOfFirst { it.equals(name, ignoreCase = true) }
+        if (i >= 0) favArtists.removeAt(i) else favArtists.add(0, name)
+        save()
+    }
+
     /** Brani ascoltati (più recenti per primi): servono anche come anagrafica di cache e download. */
     val played = mutableStateListOf<Track>()
 
@@ -220,6 +229,7 @@ class Store(context: Context) {
             if (!file.exists()) return
             val root = JSONObject(file.readText())
             root.optJSONArray("liked")?.toTracks()?.let { liked.addAll(it) }
+            root.optJSONArray("favArtists")?.let { a -> for (k in 0 until a.length()) favArtists.add(a.optString(k)) }
             root.optJSONArray("played")?.toTracks()?.let { played.addAll(it) }
             root.optJSONArray("searchPlays")?.toTracks()?.let { searchPlays.addAll(it) }
             val arr = root.optJSONArray("playlists") ?: return
@@ -241,6 +251,7 @@ class Store(context: Context) {
 
     private fun save() {
         val likedSnap = liked.toList()
+        val favSnap = favArtists.toList()
         val playlistsSnap = playlists.toList()
         val playedSnap = played.toList()
         val searchSnap = searchPlays.toList()
@@ -248,6 +259,7 @@ class Store(context: Context) {
             try {
                 val root = JSONObject()
                 root.put("liked", JSONArray(likedSnap.map { it.toJson() }))
+                root.put("favArtists", JSONArray(favSnap))
                 root.put("played", JSONArray(playedSnap.map { it.toJson() }))
                 root.put("searchPlays", JSONArray(searchSnap.map { it.toJson() }))
                 root.put(

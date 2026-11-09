@@ -287,6 +287,7 @@ fun SonoraScreen(vm: PlayerViewModel) {
     if (vm.queueOpen) QueueSheet(vm, onDismiss = { vm.queueOpen = false })
     if (vm.commentsOpen) CommentsSheet(vm, onDismiss = { vm.commentsOpen = false })
     if (vm.dedOpen) DedicationsSheet(vm, onDismiss = { vm.dedOpen = false })
+    if (vm.mashupOpen) MashupSheet(vm, onDismiss = { vm.mashupOpen = false })
     vm.dedicateTrack?.let { DedicateSheet(vm, it, onDismiss = { vm.dedicateTrack = null }) }
 
     // Dispositivo audio collegato: modello 3D + "Inizia ad ascoltare".

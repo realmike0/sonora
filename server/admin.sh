@@ -6,6 +6,8 @@
 #   bash admin.sh purge-ip  <ip>      cancella tutte le dediche di quell'impronta IP (prefisso ok) e BANNA
 #   bash admin.sh purge-user <id>     cancella le dediche di un utente e BANNA
 #   bash admin.sh purge-ded <id>      cancella una dedica (senza ban)
+#   bash admin.sh upcoming "Artista" "Album" 2026-12-25 [url-copertina]   aggiunge un album in attesa
+#   bash admin.sh upcoming-rm <id>    toglie un album in attesa
 #   bash admin.sh unban-ip <ip> | unban-user <id>
 URL="${SONORA_URL:-https://sonora-wrapped.sonorawrapped.workers.dev}"
 [ -z "$ADMIN_KEY" ] && { echo "Imposta prima: export ADMIN_KEY='...'"; exit 1; }
@@ -20,7 +22,9 @@ for i in json.load(sys.stdin).get("items",[]):
   purge-ip)   post purge "{\"ip\":\"$2\",\"ban\":true}" ;;
   purge-user) post purge "{\"user\":\"$2\",\"ban\":true}" ;;
   purge-ded)  post purge "{\"ded\":\"$2\"}" ;;
+  upcoming)   post upcoming "{\"artist\":\"$2\",\"album\":\"$3\",\"release\":$(date -d "$4" +%s)000,\"cover\":\"$5\"}" ;;
+  upcoming-rm) post upcoming "{\"remove\":\"$2\"}" ;;
   unban-ip)   post unban "{\"ip\":\"$2\"}" ;;
   unban-user) post unban "{\"user\":\"$2\"}" ;;
-  *) sed -n 2,12p "$0" ;;
+  *) sed -n 2,14p "$0" ;;
 esac

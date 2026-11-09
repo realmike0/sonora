@@ -18,3 +18,7 @@ CREATE TABLE IF NOT EXISTS sid_tok_meta (token_hash TEXT PRIMARY KEY, created IN
 CREATE TABLE IF NOT EXISTS sid_dev (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, dev_id TEXT NOT NULL DEFAULT '', name TEXT, place TEXT, ip_mask TEXT, created INTEGER NOT NULL, last INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_sid_dev_user ON sid_dev(user_id, dev_id);
 CREATE TABLE IF NOT EXISTS sid_mail_chg (user_id TEXT PRIMARY KEY, email_enc TEXT NOT NULL, new_hash TEXT NOT NULL, code_hash TEXT NOT NULL, exp INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS sid_comments (id TEXT PRIMARY KEY, track_id TEXT NOT NULL, user_id TEXT NOT NULL, name TEXT, text TEXT NOT NULL, ts INTEGER NOT NULL, hidden INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX IF NOT EXISTS idx_comments_track ON sid_comments(track_id, ts);
+CREATE TABLE IF NOT EXISTS sid_comm_reports (comment_id TEXT NOT NULL, user_id TEXT NOT NULL, PRIMARY KEY(comment_id, user_id));
+CREATE TABLE IF NOT EXISTS sid_upcoming (id TEXT PRIMARY KEY, artist TEXT NOT NULL, album TEXT NOT NULL, cover TEXT, release_ts INTEGER NOT NULL);

@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
@@ -96,6 +97,8 @@ fun LibraryScreen(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit.Dp, m
         ) { id ->
             if (id == null) {
                 LibraryHome(vm, bottomPad, onOpen = { openId = it })
+            } else if (id == FAV_ID) {
+                FavoritesPage(vm, bottomPad, onBack = { openId = null })
             } else {
                 PlaylistDetail(vm, id, bottomPad, onBack = { openId = null })
             }
@@ -142,6 +145,18 @@ private fun LibraryHome(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit
             )
                 LibraryMenu(menu, { menu = false }, vm, store.liked.toList(), true)
             }
+        }
+
+        item {
+            PlaylistCard(
+                title = "Artisti preferiti",
+                subtitle = "${store.favArtists.size} artisti · album in arrivo",
+                cover = null,
+                heart = false,
+                icon = Icons.Rounded.Star,
+                onClick = { onOpen(FAV_ID) },
+                onLongClick = {}
+            )
         }
 
         item {

@@ -3,6 +3,8 @@
 package com.sonora.music.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,6 +51,7 @@ fun CommentsSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
     var list by remember(np.id) { mutableStateOf<List<Comment>?>(null) }
     var error by remember(np.id) { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
+    var tab by remember { mutableStateOf(0) }
     var text by remember { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf<String?>(null) }
@@ -69,6 +72,12 @@ fun CommentsSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp)) {
             Text(tr("Commenti"), style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
             Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.FilterChip(selected = tab == 0, onClick = { tab = 0 }, label = { Text("Sonora") })
+                androidx.compose.material3.FilterChip(selected = tab == 1, onClick = { tab = 1 }, label = { Text("YouTube") })
+            }
+            Spacer(Modifier.height(8.dp))
+            if (tab == 0) SonoraComments(vm, np.id) else {
 
             Box(Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 420.dp)) {
                 val items = list
@@ -141,7 +150,86 @@ fun CommentsSheet(vm: PlayerViewModel, onDismiss: () -> Unit) {
                 }
                 info?.let { Text(tr(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
+            }
             Spacer(Modifier.height(16.dp))
         }
     }
 }
+
+/** Commenti di Sonora: servono un Sonora ID verificato per scrivere; l'AI controlla ogni commento prima di pubblicarlo. */
+@Composable
+private fun SonoraComments(vm: PlayerViewModel, trackId: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var list by remember(trackId) { mutableStateOf<List<com.sonora.music.SonoraId.SonoraComment>?>(null) }
+    var reload by remember { mutableStateOf(0) }
+    var text by remember { mutableStateOf("") }
+    var sending by remember { mutableStateOf(false) }
+    var info by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(trackId, reload) {
+        list = runCatching { com.sonora.music.SonoraId.comments(context, trackId) }.getOrDefault(emptyList())
+    }
+    Box(Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 420.dp)) {
+        val items = list
+        when {
+            items == null -> Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) { BouncyLoader() }
+            items.isEmpty() -> Text(tr("Nessun commento: scrivi il primo!"), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 24.dp))
+            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                itemsIndexed(items, key = { _, c -> c.id }) { _, c ->
+                    Row(verticalAlignment = Alignment.Top) {
+                        Box(
+                            Modifier.size(36.dp).androidx_clip().background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) { Text(c.name.take(1).uppercase(), color = MaterialTheme.colorScheme.onPrimaryContainer) }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(c.name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(c.text, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        androidx.compose.material3.TextButton(onClick = {
+                            scope.launch {
+                                runCatching {
+                                    if (c.mine) com.sonora.music.SonoraId.deleteComment(context, c.id)
+                                    else com.sonora.music.SonoraId.reportComment(context, c.id)
+                                }
+                                info = if (c.mine) null else "Segnalato, grazie"
+                                reload++
+                            }
+                        }) { Text(tr(if (c.mine) "Elimina" else "Segnala"), style = MaterialTheme.typography.labelSmall) }
+                    }
+                }
+            }
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    when {
+        !com.sonora.music.SonoraId.signedIn -> Text(tr("Accedi con Sonora ID nelle impostazioni per commentare."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        !com.sonora.music.SonoraId.verified -> Text(tr("Verifica la tua email per commentare."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        else -> {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = text, onValueChange = { text = it.take(280) },
+                    placeholder = { Text(tr("Scrivi un commento…")) },
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    enabled = !sending && text.isNotBlank(),
+                    onClick = {
+                        sending = true; info = null
+                        scope.launch {
+                            try {
+                                com.sonora.music.SonoraId.postComment(context, trackId, vm.store.userName.ifBlank { "Anonimo" }, text)
+                                text = ""; reload++
+                            } catch (e: Exception) {
+                                info = e.message ?: "Errore"
+                            } finally { sending = false }
+                        }
+                    }
+                ) { Icon(Icons.AutoMirrored.Rounded.Send, tr("Invia")) }
+            }
+            info?.let { Text(tr(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+    }
+}
+
+private fun Modifier.androidx_clip(): Modifier = this.clip(CircleShape)

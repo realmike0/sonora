@@ -221,4 +221,34 @@ object SonoraId {
 
     suspend fun reportDedication(c: Context, id: String) { call(c, "POST", "/v1/id/ded/$id/report", JSONObject(), auth = true) }
     suspend fun deleteDedication(c: Context, id: String) { call(c, "DELETE", "/v1/id/ded/$id", null, auth = true) }
+
+    // ───────── Commenti Sonora e album in attesa ─────────
+
+    data class SonoraComment(val id: String, val name: String, val text: String, val ts: Long, val mine: Boolean)
+    data class Upcoming(val id: String, val artist: String, val album: String, val cover: String?, val release: Long)
+
+    suspend fun comments(c: Context, trackId: String): List<SonoraComment> {
+        val r = call(c, "GET", "/v1/comments?track=$trackId", null, auth = signedIn)
+        val a = r.optJSONArray("items") ?: JSONArray()
+        return (0 until a.length()).map { i ->
+            val o = a.getJSONObject(i)
+            SonoraComment(o.optString("id"), o.optString("name"), o.optString("text"), o.optLong("ts"), o.optBoolean("mine"))
+        }
+    }
+
+    suspend fun postComment(c: Context, trackId: String, name: String, text: String) {
+        call(c, "POST", "/v1/id/comments", JSONObject().put("track", trackId).put("name", name).put("text", text), auth = true)
+    }
+
+    suspend fun reportComment(c: Context, id: String) { call(c, "POST", "/v1/id/comments/$id/report", JSONObject(), auth = true) }
+    suspend fun deleteComment(c: Context, id: String) { call(c, "DELETE", "/v1/id/comments/$id", null, auth = true) }
+
+    suspend fun upcoming(c: Context): List<Upcoming> {
+        val r = call(c, "GET", "/v1/upcoming", null, auth = false)
+        val a = r.optJSONArray("items") ?: JSONArray()
+        return (0 until a.length()).map { i ->
+            val o = a.getJSONObject(i)
+            Upcoming(o.optString("id"), o.optString("artist"), o.optString("album"), o.optString("cover").ifEmpty { null }, o.optLong("release"))
+        }
+    }
 }

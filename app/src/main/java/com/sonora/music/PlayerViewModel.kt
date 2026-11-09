@@ -52,6 +52,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     var shuffleOn by mutableStateOf(false)
     var commentsOpen by mutableStateOf(false)
     var dedOpen by mutableStateOf(false)
+    var mashupOpen by mutableStateOf(false)
     var dedicateTrack by mutableStateOf<Track?>(null)
     var translateOn by mutableStateOf(false)
     var translation by mutableStateOf<List<String>?>(null)

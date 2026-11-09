@@ -1,4 +1,12 @@
-## Sonora 0.90-beta (part 2)
+## Sonora 0.90-beta (part 3)
+
+**New**
+- Comments with Sonora ID: a "Sonora" tab next to the YouTube one, checked by AI before publishing (report / delete your own)
+- Upcoming albums with a live countdown
+- Favorite artists (heart on the artist page) and a Favorites page in Library
+- Mashup (Explore): pick up to 4 songs, choose the part of each, play them in a row
+
+## Part 2
 
 **New**
 - Settings reworked: animated header (notes pop out, the cookie spins and slows down, then settles into your profile picture)

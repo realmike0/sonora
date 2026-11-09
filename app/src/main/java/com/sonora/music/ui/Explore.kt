@@ -92,6 +92,13 @@ fun ExploreScreen(vm: PlayerViewModel, bottomPad: Dp, modifier: Modifier = Modif
             }
         }
 
+        item {
+            androidx.compose.material3.FilledTonalButton(
+                onClick = { vm.mashupOpen = true },
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+            ) { Text(tr("Crea un mashup")) }
+        }
+
         if (songs.isEmpty()) {
             item { Message(tr("Ascolta qualche brano e qui vedrai le tue statistiche")) }
             return@LazyColumn
