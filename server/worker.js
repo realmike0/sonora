@@ -543,7 +543,7 @@ async function adminRoutes(req, env, path, url) {
   }
   if (req.method === "GET" && path === "/v1/admin/users") {
     const lim = Math.min(200, parseInt(url.searchParams.get("limit")) || 60);
-    const q = (url.searchParams.get("q") || "").replace(/[^a-f0-9]/gi, "").toLowerCase();
+    const q = (url.searchParams.get("q") || "").replace(/[^\w-]/g, "").toLowerCase().replace(/_/g, "").replace(/^sid/, "");
     const rows = await env.DB.prepare(
       `SELECT u.user_id, u.created, m.verified,
         (SELECT COUNT(*) FROM sid_comments c WHERE c.user_id=u.user_id) AS comments,
@@ -554,7 +554,7 @@ async function adminRoutes(req, env, path, url) {
         (SELECT until FROM sid_susp s WHERE s.user_id=u.user_id) AS until
        FROM sid_users u LEFT JOIN sid_mail m ON m.user_id=u.user_id
        WHERE u.user_id LIKE ? ORDER BY u.created DESC LIMIT ?`
-    ).bind(q + "%", lim).all();
+    ).bind(q ? "sid_" + q + "%" : "%", lim).all();
     return J({ items: rows.results.map((r) => ({
       id: r.user_id, created: r.created, verified: !!r.verified, comments: r.comments, deds: r.deds,
       name: r.cname || r.dname || "", banned: !!r.banned, until: r.until && r.until > Date.now() ? r.until : 0,
@@ -578,7 +578,7 @@ async function adminRoutes(req, env, path, url) {
   }
   if (req.method === "POST" && path === "/v1/admin/user") {
     const b = await req.json();
-    const uid = typeof b.user === "string" && /^[a-f0-9]{8,64}$/.test(b.user) ? b.user : null;
+    const uid = typeof b.user === "string" && /^[\w-]{6,80}$/.test(b.user) ? b.user : null;
     if (!uid) return err("Utente non valido");
     const k = "user:" + uid;
     if (b.action === "ban") await env.DB.prepare("INSERT OR IGNORE INTO sid_ban(k,ts) VALUES(?,?)").bind(k, Date.now()).run();
