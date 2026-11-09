@@ -25,6 +25,7 @@ class MainActivity : ComponentActivity() {
         Perf.init(this)
         com.sonora.music.ui.Lang.load(this)
         com.sonora.music.ui.AppStyle.load(this)
+        com.sonora.music.ui.AppTheme.load(this)
         WrappedReminder.schedule(this)
         handleIntent(intent)
         Headsets.startService(this)

@@ -1,6 +1,24 @@
 package com.sonora.music.ui
 
 import android.os.Build
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.rounded.ManageAccounts
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -53,133 +71,301 @@ import com.sonora.music.SyncState
 @OptIn(ExperimentalLayoutApi::class, androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier = Modifier) {
+    var page by remember { mutableStateOf<String?>(null) }
+    androidx.activity.compose.BackHandler(enabled = page != null) { page = null }
+    Surface(color = MaterialTheme.colorScheme.background, contentColor = MaterialTheme.colorScheme.onBackground, modifier = modifier.fillMaxSize()) {
+        androidx.compose.animation.AnimatedContent(
+            targetState = page,
+            transitionSpec = {
+                val spec = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(300, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+                if (targetState != null) {
+                    (androidx.compose.animation.slideInHorizontally(spec) { it / 4 } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)))
+                        .togetherWith(androidx.compose.animation.slideOutHorizontally(spec) { -it / 6 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160)))
+                } else {
+                    (androidx.compose.animation.slideInHorizontally(spec) { -it / 6 } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)))
+                        .togetherWith(androidx.compose.animation.slideOutHorizontally(spec) { it / 4 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160)))
+                }
+            },
+            label = "settings"
+        ) { p ->
+            if (p == null) SettingsHub(vm, onClose, open = { page = it })
+            else SettingsPage(vm, p, onBack = { page = null })
+        }
+    }
+}
+
+private class SettingsNotes(val glyph: String, val angle: Float, val dist: Float, val size: Float)
+
+@Composable
+private fun SettingsHub(vm: PlayerViewModel, onClose: () -> Unit, open: (String) -> Unit) {
+    val context = LocalContext.current
+    val store = vm.store
+    val installed = remember { com.sonora.music.Framework.installed(context) }
+    Column(Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(bottom = 64.dp)) {
+        Row(Modifier.padding(start = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = tr("Indietro")) }
+            Text(tr("Impostazioni"), style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
+        }
+        SettingsHeader(store.userName.ifBlank { "Ospite" }, installed)
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            Button(onClick = { if (installed) com.sonora.music.Framework.manage(context) else open("manage") }) {
+                Icon(Icons.Rounded.ManageAccounts, null)
+                Spacer(Modifier.width(8.dp))
+                Text(tr("Gestisci"))
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+        Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            val rows = listOf(
+                Triple("style", Icons.Rounded.Palette, tr("Style")),
+                Triple("player", Icons.Rounded.MusicNote, tr("Player")),
+                Triple("advanced", Icons.Rounded.Tune, tr("Advanced")),
+                Triple("languages", Icons.Rounded.Language, tr("Languages")),
+                Triple("info", Icons.Rounded.Info, tr("Info"))
+            )
+            rows.forEachIndexed { i, (id, icon, label) ->
+                val r = 22.dp
+                val shape = RoundedCornerShape(
+                    topStart = if (i == 0) r else 6.dp, topEnd = if (i == 0) r else 6.dp,
+                    bottomStart = if (i == rows.lastIndex) r else 6.dp, bottomEnd = if (i == rows.lastIndex) r else 6.dp
+                )
+                Surface(
+                    onClick = { open(id) },
+                    shape = shape,
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(Modifier.padding(horizontal = 18.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) { Icon(icon, null, tint = MaterialTheme.colorScheme.onPrimaryContainer) }
+                        Spacer(Modifier.width(16.dp))
+                        Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Intestazione animata: per 3 secondi il cerchio "biscotto" gira rallentando e le note schizzano fuori;
+ * poi tutto rientra in 0,5 secondi e resta un cerchio normale con la foto profilo del Framework.
+ */
+@Composable
+private fun SettingsHeader(name: String, hasFramework: Boolean) {
+    val context = LocalContext.current
+    val t = remember { androidx.compose.animation.core.Animatable(0f) }      // 0..1 durante i 3 secondi
+    val settle = remember { androidx.compose.animation.core.Animatable(0f) } // 0..1 durante i 0,5 secondi
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        t.animateTo(1f, tween(3000, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
+        settle.animateTo(1f, tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+    }
+    val notes = remember {
+        listOf("♪", "♫", "♬", "♩", "♪", "♫", "♬", "♩", "♪", "♫").mapIndexed { i, g ->
+            SettingsNotes(g, i * 36f + (i % 3) * 7f, 0.55f + (i % 4) * 0.12f, 18f + (i % 3) * 8f)
+        }
+    }
+    val amp = 0.06f * (1f - settle.value)
+    val rotation = t.value * 1080f
+    val shape = remember(amp, rotation) {
+        object : androidx.compose.ui.graphics.Shape {
+            override fun createOutline(
+                size: androidx.compose.ui.geometry.Size,
+                layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+                density: androidx.compose.ui.unit.Density
+            ): androidx.compose.ui.graphics.Outline {
+                val path = androidx.compose.ui.graphics.Path()
+                val cx = size.width / 2f; val cy = size.height / 2f
+                val r = minOf(cx, cy) / 1.06f
+                val rot = Math.toRadians(rotation.toDouble()).toFloat()
+                for (i in 0..180) {
+                    val a = (i / 180f) * 2f * Math.PI.toFloat()
+                    val rr = r * (1f + amp * kotlin.math.cos(9 * (a - rot)))
+                    val x = cx + rr * kotlin.math.cos(a); val y = cy + rr * kotlin.math.sin(a)
+                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                path.close()
+                return androidx.compose.ui.graphics.Outline.Generic(path)
+            }
+        }
+    }
+    val color = MaterialTheme.colorScheme.primary
+    Box(Modifier.fillMaxWidth().height(250.dp), contentAlignment = Alignment.Center) {
+        // le note: escono con il giro (rallentando) e rientrano nel cerchio alla fine
+        val out = (1f - (1f - t.value) * (1f - t.value)) * (1f - settle.value)
+        val fade = if (settle.value > 0f) (1f - settle.value) else 1f
+        notes.forEach { n ->
+            val rad = Math.toRadians((n.angle + rotation * 0.25f).toDouble())
+            val d = 150f * n.dist * out
+            Text(
+                n.glyph,
+                color = color.copy(alpha = fade * 0.9f),
+                fontSize = n.size.sp,
+                modifier = Modifier.graphicsLayer {
+                    translationX = (kotlin.math.cos(rad) * d).toFloat() * density
+                    translationY = (kotlin.math.sin(rad) * d).toFloat() * density
+                    rotationZ = (n.angle + rotation * 0.5f)
+                    alpha = if (out < 0.02f) 0f else 1f
+                }
+            )
+        }
+        Box(Modifier.size(150.dp).clip(shape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+            if (hasFramework) {
+                coil.compose.AsyncImage(
+                    model = remember { com.sonora.music.Framework.avatarUri },
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            Text(
+                name.take(1).uppercase(),
+                style = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+    }
+    Text(
+        name,
+        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+        modifier = Modifier.fillMaxWidth(),
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class, androidx.media3.common.util.UnstableApi::class)
+@Composable
+private fun SettingsPage(vm: PlayerViewModel, page: String, onBack: () -> Unit) {
     val store = vm.store
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
     val version = remember {
-        try {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
-        } catch (e: Exception) {
-            "?"
-        }
+        try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?" } catch (e: Exception) { "?" }
     }
-
-    val typography = MaterialTheme.typography
-    // Schermata sempre scura con i colori dinamici del telefono: testo chiaro e leggibile.
-    val scheme = remember(AppStyle.id) { styleScheme(context, dark = true) }
-
-    MaterialTheme(colorScheme = scheme, typography = typography) {
-    Surface(
-        color = scheme.background,
-        contentColor = scheme.onBackground,
-        modifier = modifier.fillMaxSize()
+    val title = when (page) {
+        "manage" -> tr("Gestisci"); "style" -> tr("Style"); "player" -> tr("Player")
+        "advanced" -> tr("Advanced"); "languages" -> tr("Languages"); else -> tr("Info")
+    }
+    Column(
+        Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState())
+            .padding(start = 20.dp, end = 20.dp, bottom = 64.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, end = 20.dp, bottom = 64.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onClose) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = tr("Indietro"))
-                }
-                Text(
-                    tr("Impostazioni"),
-                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold)
-                )
-            }
-
-            SettingsCard(tr("Profilo")) {
-                Text(store.userName.ifBlank { "Ospite" }, style = MaterialTheme.typography.titleMedium)
-                if (store.googleCookie == null) {
-                    Text(
-                        tr("Account locale"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+        Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = tr("Indietro")) }
+            Text(title, style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold))
+        }
+        when (page) {
+            "manage" -> SettingsCard(tr("Profilo")) {
                 GoogleSection(vm)
                 SonoraIdSection(vm)
             }
-
-            SettingsCard(tr("Stile")) {
-                StyleSection()
+            "style" -> {
+                SettingsCard(tr("Colori")) { ThemeSection() }
+                SettingsCard(tr("Stile")) { StyleSection() }
             }
-
-            SettingsCard(tr("Lingua")) {
-                LanguageSection()
+            "player" -> {
+                SettingsCard(tr("Testi")) { LyricsSourcePicker(store) }
+                SettingsCard(tr("Qualità audio")) { AudioQualitySection() }
+                SettingsCard(tr("Equalizzatore")) { EqualizerSection() }
+                SettingsCard(tr("Dissolvenza avanzata")) { FadeSection() }
             }
-
-            SettingsCard(tr("Testi")) {
-                LyricsSourcePicker(store)
-            }
-
-            // Il Wrapped compare solo a dicembre, a fine anno.
-            if (java.time.LocalDate.now().monthValue == 12) {
-                SettingsCard(tr("Wrapped e tracciamento")) {
-                    TrackingSection(onWrapped = { vm.wrappedOpen = true; vm.settingsOpen = false })
+            "advanced" -> {
+                if (java.time.LocalDate.now().monthValue == 12) {
+                    SettingsCard(tr("Wrapped e tracciamento")) {
+                        TrackingSection(onWrapped = { vm.wrappedOpen = true; vm.settingsOpen = false })
+                    }
                 }
+                SettingsCard(tr("Prestazioni")) { PerfSection() }
+                SettingsCard(tr("Tocco")) { HapticsSection(); AudioHapticsSection() }
+                SettingsCard(tr("Sempre attiva")) { KeepAliveSection() }
+                SettingsCard(tr("Memoria e cache")) { CacheSection() }
             }
-
-            SettingsCard(tr("Qualità audio")) {
-                AudioQualitySection()
-            }
-
-            SettingsCard(tr("Equalizzatore")) {
-                EqualizerSection()
-            }
-
-            SettingsCard(tr("Dissolvenza avanzata")) {
-                FadeSection()
-            }
-
-            SettingsCard(tr("Prestazioni")) {
-                PerfSection()
-            }
-
-            SettingsCard(tr("Tocco")) {
-                HapticsSection()
-                AudioHapticsSection()
-            }
-
-            SettingsCard(tr("Sempre attiva")) {
-                KeepAliveSection()
-            }
-
-            SettingsCard(tr("Aggiornamenti")) {
-                UpdateSection(vm, version)
-            }
-
-            SettingsCard(tr("Memoria e cache")) {
-                CacheSection()
-            }
-
-            SettingsCard(tr("Community")) {
-                Text(
-                    tr("Novità, aggiornamenti e supporto sul canale Telegram di Sonora."),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Button(onClick = { uriHandler.openUri("https://t.me/sonoraclient") }) {
-                    Text(tr("Apri su Telegram"))
+            "languages" -> SettingsCard(tr("Lingua")) { LanguageSection() }
+            else -> {
+                SettingsCard(tr("Informazioni")) { Text("Sonora $version", style = MaterialTheme.typography.titleMedium) }
+                SettingsCard(tr("Aggiornamenti")) { UpdateSection(vm, version) }
+                SettingsCard(tr("Community")) {
+                    Text(tr("Novità, aggiornamenti e supporto sul canale Telegram di Sonora."), style = MaterialTheme.typography.bodyMedium)
+                    Button(onClick = { uriHandler.openUri("https://t.me/sonoraclient") }) { Text(tr("Apri su Telegram")) }
+                    Text(tr("t.me/sonoraclient"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text(
-                    tr("t.me/sonoraclient"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Watermark(Modifier.padding(top = 8.dp, bottom = 8.dp))
             }
-
-            SettingsCard(tr("Informazioni")) {
-                Text("Sonora $version", style = MaterialTheme.typography.titleMedium)
-            }
-
-            // Filigrana: in fondo alla pagina, scorre insieme al resto (non resta sovrapposta).
-            Watermark(Modifier.padding(top = 8.dp, bottom = 8.dp))
         }
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ThemeSection() {
+    val context = LocalContext.current
+    val canDynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    if (canDynamic) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(tr("Colori dinamici"), style = MaterialTheme.typography.titleSmall)
+                Text(tr("Usa i colori dello sfondo del telefono"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            androidx.compose.material3.Switch(checked = AppTheme.dynamic, onCheckedChange = { AppTheme.setDynamic(context, it) })
+        }
+    }
+    if (!canDynamic || !AppTheme.dynamic) {
+        Text(tr("Scegli il colore"), style = MaterialTheme.typography.titleSmall)
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            ColorWheel(AppTheme.hue) { AppTheme.setHue(context, it) }
+        }
+    }
+    Text(tr("Tema"), style = MaterialTheme.typography.titleSmall)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf("light" to tr("Chiaro"), "dark" to tr("Scuro"), "system" to tr("Come il dispositivo")).forEach { (id, label) ->
+            FilterChip(selected = AppTheme.mode == id, onClick = { AppTheme.setMode(context, id) }, label = { Text(label) })
+        }
+    }
+}
+
+/** Selettore di colore circolare: anello con tutte le tonalità e un cursore da trascinare. */
+@Composable
+private fun ColorWheel(hue: Float, onHue: (Float) -> Unit) {
+    val size = 220.dp
+    val preview = seedScheme(hue, false).primary
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        androidx.compose.foundation.Canvas(
+            Modifier.fillMaxSize().pointerInput(Unit) {
+                fun upd(o: androidx.compose.ui.geometry.Offset) {
+                    val dx = o.x - this.size.width / 2f; val dy = o.y - this.size.height / 2f
+                    var d = Math.toDegrees(kotlin.math.atan2(dy, dx).toDouble()).toFloat()
+                    if (d < 0) d += 360f
+                    onHue(d)
+                }
+                androidx.compose.foundation.gestures.detectDragGestures(onDragStart = { upd(it) }) { c, _ -> upd(c.position) }
+            }.pointerInput(Unit) {
+                androidx.compose.foundation.gestures.detectTapGestures { o ->
+                    val dx = o.x - this.size.width / 2f; val dy = o.y - this.size.height / 2f
+                    var d = Math.toDegrees(kotlin.math.atan2(dy, dx).toDouble()).toFloat()
+                    if (d < 0) d += 360f
+                    onHue(d)
+                }
+            }
+        ) {
+            val stroke = 34.dp.toPx()
+            val r = this.size.minDimension / 2f - stroke / 2f
+            val colors = (0..12).map { Color.hsl((it * 30f) % 360f, 0.75f, 0.55f) }
+            drawCircle(
+                brush = androidx.compose.ui.graphics.Brush.sweepGradient(colors, center),
+                radius = r,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(stroke)
+            )
+            val a = Math.toRadians(hue.toDouble())
+            val p = androidx.compose.ui.geometry.Offset(center.x + r * kotlin.math.cos(a).toFloat(), center.y + r * kotlin.math.sin(a).toFloat())
+            drawCircle(Color.White, radius = stroke / 2f + 4.dp.toPx(), center = p)
+            drawCircle(Color.hsl(hue, 0.75f, 0.55f), radius = stroke / 2f - 2.dp.toPx(), center = p)
+        }
+        Box(Modifier.size(84.dp).clip(CookieShape).background(preview))
     }
 }
 

@@ -1,4 +1,15 @@
-## Sonora 0.90-beta (part 1)
+## Sonora 0.90-beta (part 2)
+
+**New**
+- Settings reworked: animated header (notes pop out, the cookie spins and slows down, then settles into your profile picture)
+- Settings pages: Style, Player, Advanced, Languages, Info (+ Manage for your account)
+- Style: dynamic colors on/off, round color picker when off, light / dark / follow device
+- New Material 3 loading indicator everywhere
+- Pages now slide in from the right, like stock Android 14+ (no bounce)
+- Blur at the bottom of the player cover
+- Faint Sonora logo tinted with the cover color, in the player and in the lyrics image
+
+## Part 1
 
 **New**
 - Sonora Framework, a separate app with no icon that manages Sonora ID accounts (installs with one tap from Sonora)

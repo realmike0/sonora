@@ -130,6 +130,14 @@ internal var miniCoverRect by mutableStateOf<androidx.compose.ui.geometry.Rect?>
 // Molla "gommosa" usata da quasi tutte le animazioni.
 private const val BOUNCY = Spring.DampingRatioMediumBouncy
 
+/** Entrata delle pagine a tutto schermo: da destra a sinistra, come Android 14+ (niente rimbalzo). */
+private val PAGE_IN = androidx.compose.animation.slideInHorizontally(
+    tween(350, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+) { it / 4 } + fadeIn(tween(250))
+private val PAGE_OUT = androidx.compose.animation.slideOutHorizontally(
+    tween(250, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+) { it / 4 } + fadeOut(tween(200))
+
 /** Radice dell'app: onboarding al primo avvio, poi l'app vera. Il login Google sta sopra a tutto. */
 @Composable
 fun SonoraRoot(vm: PlayerViewModel) {
@@ -150,8 +158,8 @@ fun SonoraRoot(vm: PlayerViewModel) {
 
         AnimatedVisibility(
             visible = vm.settingsOpen && vm.store.onboarded,
-            enter = slideInVertically(spring(BOUNCY, Spring.StiffnessMediumLow)) { it / 3 } + fadeIn(),
-            exit = slideOutVertically { it / 3 } + fadeOut()
+            enter = PAGE_IN,
+            exit = PAGE_OUT
         ) {
             val back = predictiveBack { vm.settingsOpen = false }
             Box(Modifier.backEffect(back)) {
@@ -166,8 +174,8 @@ fun SonoraRoot(vm: PlayerViewModel) {
 
         AnimatedVisibility(
             visible = vm.loginOpen,
-            enter = slideInVertically(spring(BOUNCY, Spring.StiffnessLow)) { it } + fadeIn(),
-            exit = slideOutVertically { it } + fadeOut()
+            enter = PAGE_IN,
+            exit = PAGE_OUT
         ) {
             GoogleLoginScreen(
                 onCookie = { vm.connectGoogle(it) },
@@ -226,8 +234,8 @@ fun SonoraScreen(vm: PlayerViewModel) {
         // Pagina dell'artista: copre la schermata, ma sotto a mini player e barra.
         AnimatedVisibility(
             visible = vm.artistOpen != null,
-            enter = fadeIn(tween(250)) + scaleIn(initialScale = 0.94f, animationSpec = spring(BOUNCY, Spring.StiffnessMediumLow)),
-            exit = fadeOut(tween(150))
+            enter = PAGE_IN,
+            exit = PAGE_OUT
         ) {
             val name = vm.artistOpen
             if (name != null) {

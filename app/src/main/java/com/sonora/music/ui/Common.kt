@@ -13,6 +13,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import coil.imageLoader
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -150,38 +152,76 @@ fun Message(text: String) {
     }
 }
 
-/** Tre palline che rimbalzano a ondate. */
+/**
+ * Indicatore di caricamento Material 3 (non determinato): una forma che ruota e si trasforma di continuo
+ * (triangolo morbido → fiore → biscotto → ovale), nei colori del tema.
+ */
 @Composable
-fun BouncyLoader() {
-    val transition = rememberInfiniteTransition(label = "loader")
-    val colors = listOf(
-        MaterialTheme.colorScheme.primary,
-        MaterialTheme.colorScheme.secondary,
-        MaterialTheme.colorScheme.tertiary
-    )
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        colors.forEachIndexed { i, color ->
-            val y by transition.animateFloat(
-                initialValue = 0f,
-                targetValue = -24f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(420, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse,
-                    initialStartOffset = StartOffset(i * 140)
-                ),
-                label = "dot$i"
-            )
-            Box(
-                Modifier
-                    .size(18.dp)
-                    .offset(y = y.dp)
-                    .background(color, CircleShape)
-            )
+fun BouncyLoader(size: androidx.compose.ui.unit.Dp = 56.dp) {
+    val t = rememberInfiniteTransition(label = "loader")
+    val rot by t.animateFloat(0f, 360f, infiniteRepeatable(tween(2600, easing = LinearEasing)), label = "rot")
+    val morph by t.animateFloat(0f, 5f, infiniteRepeatable(tween(5000, easing = LinearEasing)), label = "morph")
+    val shape = MaterialTheme.colorScheme.primary
+    val bg = MaterialTheme.colorScheme.primaryContainer
+    // (numero di lobi, ampiezza) di ogni forma
+    val forms = listOf(3 to 0.17f, 5 to 0.12f, 9 to 0.07f, 2 to 0.13f, 7 to 0.09f)
+    androidx.compose.foundation.Canvas(Modifier.size(size)) {
+        val r = this.size.minDimension / 2f
+        drawCircle(bg, radius = r)
+        val i = morph.toInt() % forms.size
+        val j = (i + 1) % forms.size
+        val f0 = morph - morph.toInt()
+        val f = f0 * f0 * (3f - 2f * f0)
+        val path = androidx.compose.ui.graphics.Path()
+        val steps = 120
+        for (k in 0..steps) {
+            val a = (k.toFloat() / steps) * 2f * Math.PI.toFloat()
+            val rr = r * 0.62f * (1f +
+                (1f - f) * forms[i].second * kotlin.math.cos(forms[i].first * a) +
+                f * forms[j].second * kotlin.math.cos(forms[j].first * a))
+            val x = center.x + rr * kotlin.math.cos(a)
+            val y = center.y + rr * kotlin.math.sin(a)
+            if (k == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
+        path.close()
+        androidx.compose.ui.graphics.drawscope.rotate(rot, center) { drawPath(path, shape) }
     }
+}
+
+/** Logo di Sonora, in un solo colore (lo usiamo quasi invisibile, tinto sulla copertina). */
+@Composable
+fun SonoraMark(color: Color, alpha: Float, modifier: Modifier = Modifier) {
+    androidx.compose.foundation.Image(
+        painter = androidx.compose.ui.res.painterResource(com.sonora.music.R.drawable.ic_launcher_monochrome),
+        contentDescription = null,
+        modifier = modifier,
+        alpha = alpha,
+        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(color)
+    )
+}
+
+/** Colore chiaro e sobrio preso dalla copertina (media dei pixel), per tingere il logo. */
+@Composable
+fun rememberCoverColor(url: String?): Color {
+    val ctx = LocalContext.current
+    var color by remember(url) { mutableStateOf(Color.White) }
+    androidx.compose.runtime.LaunchedEffect(url) {
+        if (url == null) return@LaunchedEffect
+        val r = ctx.imageLoader.execute(ImageRequest.Builder(ctx).data(url.sized(64)).size(32).allowHardware(false).build())
+        val bmp = (r.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: return@LaunchedEffect
+        val s = android.graphics.Bitmap.createScaledBitmap(bmp, 8, 8, true)
+        var rr = 0L; var gg = 0L; var bb = 0L
+        for (x in 0 until 8) for (y in 0 until 8) {
+            val p = s.getPixel(x, y)
+            rr += android.graphics.Color.red(p); gg += android.graphics.Color.green(p); bb += android.graphics.Color.blue(p)
+        }
+        val hsl = FloatArray(3)
+        androidx.core.graphics.ColorUtils.RGBToHSL((rr / 64).toInt(), (gg / 64).toInt(), (bb / 64).toInt(), hsl)
+        hsl[1] = hsl[1].coerceAtMost(0.8f)
+        hsl[2] = hsl[2].coerceAtLeast(0.72f)
+        color = Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+    }
+    return color
 }
 
 /**

@@ -194,16 +194,17 @@ object LyricImage {
             y += it.height + gap
         }
 
-        // Logo Sonora: cerchio con triangolo play + nome.
+        // Logo Sonora quasi invisibile, tinto sul colore della copertina.
         val cy = footerTop + 32f
-        val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = textColor; style = Paint.Style.STROKE; strokeWidth = 6f }
-        c.drawCircle(PAD + 32f, cy, 29f, ring)
-        val tri = Path().apply {
-            moveTo(PAD + 24f, cy - 15f); lineTo(PAD + 24f, cy + 15f); lineTo(PAD + 48f, cy); close()
+        val faint = android.graphics.Color.HSVToColor(70, floatArrayOf(hue, 0.25f, 0.95f))
+        androidx.core.content.ContextCompat.getDrawable(context, com.sonora.music.R.drawable.ic_launcher_monochrome)?.mutate()?.let { d ->
+            d.setTint(faint)
+            val s = 110
+            d.setBounds((PAD - 24f).toInt(), (cy - s / 2f).toInt(), (PAD - 24f).toInt() + s, (cy + s / 2f).toInt())
+            d.draw(c)
         }
-        c.drawPath(tri, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = textColor })
-        val mark = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = textColor; typeface = Typeface.DEFAULT_BOLD; textSize = 54f }
-        c.drawText("Sonora", PAD + 82f, cy + 19f, mark)
+        val mark = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = faint; typeface = Typeface.DEFAULT_BOLD; textSize = 50f }
+        c.drawText("Sonora", PAD + 92f, cy + 18f, mark)
 
         val dir = File(context.cacheDir, "lyrics").apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }

@@ -54,7 +54,7 @@ private val SonoraTypography: Typography = Typography().let { t ->
 /** Material 3 con colori dinamici (Material You) e font Outfit. Lo stile Expressive (molle, forme morbide) è nei componenti. */
 @Composable
 fun SonoraTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+    val dark = AppTheme.dark(isSystemInDarkTheme())
     val context = LocalContext.current
     val colors = styleScheme(context, dark)
 

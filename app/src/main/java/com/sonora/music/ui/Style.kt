@@ -86,6 +86,63 @@ object AppStyle {
         }
 }
 
+/** Tema: colori dinamici o colore scelto a mano (cerchio dei colori), e chiaro / scuro / come il dispositivo. */
+object AppTheme {
+    var dynamic by mutableStateOf(true)
+        private set
+    var hue by mutableStateOf(220f)
+        private set
+    var mode by mutableStateOf("system")
+        private set
+
+    private fun p(c: Context) = c.getSharedPreferences("sonora", Context.MODE_PRIVATE)
+
+    fun load(c: Context) {
+        dynamic = p(c).getBoolean("theme_dynamic", true)
+        hue = p(c).getFloat("theme_hue", 220f)
+        mode = p(c).getString("theme_mode", "system") ?: "system"
+    }
+
+    fun setDynamic(c: Context, v: Boolean) { dynamic = v; p(c).edit().putBoolean("theme_dynamic", v).apply() }
+    fun setHue(c: Context, h: Float) { hue = h; p(c).edit().putFloat("theme_hue", h).apply() }
+    fun setMode(c: Context, m: String) { mode = m; p(c).edit().putString("theme_mode", m).apply() }
+
+    fun dark(system: Boolean) = when (mode) { "light" -> false; "dark" -> true; else -> system }
+}
+
+/** Tavolozza Material 3 costruita da un solo colore (tonalità): per chi spegne i colori dinamici. */
+fun seedScheme(hue: Float, dark: Boolean): ColorScheme {
+    fun c(h: Float, s: Float, l: Float) = Color.hsl(((h % 360f) + 360f) % 360f, s, l)
+    val h = hue
+    return if (dark) darkColorScheme(
+        primary = c(h, .75f, .76f), onPrimary = c(h, .60f, .16f),
+        primaryContainer = c(h, .45f, .27f), onPrimaryContainer = c(h, .85f, .90f),
+        secondary = c(h + 18, .32f, .72f), onSecondary = c(h + 18, .30f, .16f),
+        secondaryContainer = c(h + 18, .26f, .27f), onSecondaryContainer = c(h + 18, .45f, .90f),
+        tertiary = c(h + 60, .45f, .75f), onTertiary = c(h + 60, .40f, .16f),
+        tertiaryContainer = c(h + 60, .32f, .28f), onTertiaryContainer = c(h + 60, .55f, .90f),
+        background = c(h, .14f, .08f), onBackground = c(h, .18f, .92f),
+        surface = c(h, .14f, .08f), onSurface = c(h, .18f, .92f),
+        surfaceVariant = c(h, .12f, .22f), onSurfaceVariant = c(h, .16f, .78f),
+        surfaceContainerLowest = c(h, .14f, .05f), surfaceContainerLow = c(h, .14f, .10f), surfaceContainer = c(h, .14f, .12f),
+        surfaceContainerHigh = c(h, .14f, .16f), surfaceContainerHighest = c(h, .14f, .20f),
+        outline = c(h, .10f, .55f)
+    ) else lightColorScheme(
+        primary = c(h, .55f, .38f), onPrimary = Color.White,
+        primaryContainer = c(h, .85f, .90f), onPrimaryContainer = c(h, .70f, .14f),
+        secondary = c(h + 18, .25f, .40f), onSecondary = Color.White,
+        secondaryContainer = c(h + 18, .50f, .90f), onSecondaryContainer = c(h + 18, .50f, .14f),
+        tertiary = c(h + 60, .30f, .40f), onTertiary = Color.White,
+        tertiaryContainer = c(h + 60, .60f, .90f), onTertiaryContainer = c(h + 60, .60f, .14f),
+        background = c(h, .40f, .98f), onBackground = c(h, .20f, .10f),
+        surface = c(h, .40f, .98f), onSurface = c(h, .20f, .10f),
+        surfaceVariant = c(h, .30f, .90f), onSurfaceVariant = c(h, .15f, .30f),
+        surfaceContainerLowest = Color.White, surfaceContainerLow = c(h, .40f, .96f), surfaceContainer = c(h, .35f, .94f),
+        surfaceContainerHigh = c(h, .32f, .92f), surfaceContainerHighest = c(h, .30f, .90f),
+        outline = c(h, .10f, .45f)
+    )
+}
+
 /** Colori dello stile scelto: Miuix ha una tavolozza neutra con accento blu; gli altri seguono i colori del telefono. */
 fun styleScheme(context: Context, dark: Boolean): ColorScheme {
     if (AppStyle.id == StyleId.MIUIX) {
@@ -113,9 +170,8 @@ fun styleScheme(context: Context, dark: Boolean): ColorScheme {
         )
     }
     return when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+        AppTheme.dynamic && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        dark -> darkColorScheme()
-        else -> lightColorScheme()
+        else -> seedScheme(AppTheme.hue, dark)
     }
 }

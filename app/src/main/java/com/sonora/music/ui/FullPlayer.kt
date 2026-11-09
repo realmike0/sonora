@@ -78,6 +78,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.layout.requiredHeight
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -208,11 +212,33 @@ fun FullPlayer(vm: PlayerViewModel, onDismiss: () -> Unit, onArtist: (String) ->
                         VideoSurface(vm, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
                     }
                 }
+                // Sfocatura in fondo alla copertina: la stessa immagine, sfocata, sfumata verso il basso.
+                if (android.os.Build.VERSION.SDK_INT >= 31) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                            .drawWithContent {
+                                drawContent()
+                                drawRect(
+                                    Brush.verticalGradient(0.62f to Color.Transparent, 1f to Color.Black),
+                                    blendMode = androidx.compose.ui.graphics.BlendMode.DstIn
+                                )
+                            }
+                    ) {
+                        Artwork(np.artwork, Modifier.fillMaxSize().blur(26.dp), RectangleShape, px = 400)
+                    }
+                }
                 // La copertina si fonde con lo sfondo sotto.
                 Box(
                     Modifier
                         .fillMaxSize()
                         .background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.62f)))
+                )
+                // Logo Sonora quasi invisibile, tinto sul colore della copertina.
+                SonoraMark(
+                    rememberCoverColor(np.artwork), 0.22f,
+                    Modifier.align(Alignment.BottomEnd).padding(end = 14.dp, bottom = 10.dp).size(44.dp)
                 )
             }
 
