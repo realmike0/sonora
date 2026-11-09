@@ -15,6 +15,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearEasing
 import coil.imageLoader
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -184,7 +185,7 @@ fun BouncyLoader(size: androidx.compose.ui.unit.Dp = 56.dp) {
             if (k == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
         path.close()
-        androidx.compose.ui.graphics.drawscope.rotate(rot, center) { drawPath(path, shape) }
+        rotate(rot, center) { drawPath(path, shape) }
     }
 }
 

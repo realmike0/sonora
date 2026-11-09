@@ -1,6 +1,9 @@
 package com.sonora.music.ui
 
 import android.os.Build
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -342,9 +345,9 @@ private fun ColorWheel(hue: Float, onHue: (Float) -> Unit) {
                     if (d < 0) d += 360f
                     onHue(d)
                 }
-                androidx.compose.foundation.gestures.detectDragGestures(onDragStart = { upd(it) }) { c, _ -> upd(c.position) }
+                detectDragGestures(onDragStart = { upd(it) }) { c, _ -> upd(c.position) }
             }.pointerInput(Unit) {
-                androidx.compose.foundation.gestures.detectTapGestures { o ->
+                detectTapGestures { o ->
                     val dx = o.x - this.size.width / 2f; val dy = o.y - this.size.height / 2f
                     var d = Math.toDegrees(kotlin.math.atan2(dy, dx).toDouble()).toFloat()
                     if (d < 0) d += 360f
