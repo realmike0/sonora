@@ -3,7 +3,7 @@
 **New**
 - Inbox in Settings (next to Manage): messages from the team and tickets with the admin (chat)
 - When you open Sonora a banner drops from the top with a complaint, suspension or ban, with a button to open a ticket
-- System notification in the same style as the headphones one: yellow for a complaint, grey for a suspension, red for a ban
+- Full-screen notification (like the headphones one): yellow for a complaint, grey for a suspension, red for a ban. On Android 14+ allow it in Settings → Advanced
 - Moderators: tagged by the admin, they can remove comments, suspend (up to 7 days), send complaints and report to the admin
 - A small shield next to moderators shows how long they have been moderators (see docs/MODERATORS.md)
 - Reports weigh more when they come from moderators, and the admin's report hides a comment right away

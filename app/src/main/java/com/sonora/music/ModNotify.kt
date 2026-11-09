@@ -29,6 +29,20 @@ object ModNotify {
         "ticket" -> "Risposta al tuo ticket"; else -> "Sonora"
     }
 
+    /** Da Android 14 l'avviso a schermo intero va concesso a mano: apre la pagina giusta delle impostazioni. */
+    fun fullScreenAllowed(context: Context): Boolean =
+        Build.VERSION.SDK_INT < 34 ||
+            (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).canUseFullScreenIntent()
+
+    fun askFullScreen(context: Context) {
+        if (Build.VERSION.SDK_INT >= 34) {
+            context.startActivity(
+                Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, android.net.Uri.parse("package:" + context.packageName))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+    }
+
     fun show(context: Context, n: SonoraId.Notice) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -60,7 +74,10 @@ object ModNotify {
             .setCustomBigContentView(view)
             .setAutoCancel(true)
             .setContentIntent(open)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setFullScreenIntent(open, true)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
             .build()
         try {
             NotificationManagerCompat.from(context).notify(4300 + (n.id.hashCode() and 0xff), notif)

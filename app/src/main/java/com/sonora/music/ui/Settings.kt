@@ -297,6 +297,12 @@ private fun SettingsPage(vm: PlayerViewModel, page: String, onBack: () -> Unit, 
                         TrackingSection(onWrapped = { vm.wrappedOpen = true; vm.settingsOpen = false })
                     }
                 }
+                if (!com.sonora.music.ModNotify.fullScreenAllowed(context)) {
+                    SettingsCard(tr("Avvisi a schermo intero")) {
+                        Text(tr("Permetti a Sonora di mostrare gli avvisi importanti (reclami, sospensioni) a schermo intero."), style = MaterialTheme.typography.bodyMedium)
+                        Button(onClick = { com.sonora.music.ModNotify.askFullScreen(context) }) { Text(tr("Permetti")) }
+                    }
+                }
                 SettingsCard(tr("Prestazioni")) { PerfSection() }
                 SettingsCard(tr("Tocco")) { HapticsSection(); AudioHapticsSection() }
                 SettingsCard(tr("Sempre attiva")) { KeepAliveSection() }
