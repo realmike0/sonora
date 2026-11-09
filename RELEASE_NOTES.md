@@ -7,6 +7,8 @@
 - Moderators: tagged by the admin, they can remove comments, suspend (up to 7 days), send complaints and report to the admin
 - A small shield next to moderators shows how long they have been moderators (see docs/MODERATORS.md)
 - Reports weigh more when they come from moderators, and the admin's report hides a comment right away
+- Ticket chat redesigned: pill text box that grows and sits above the keyboard, auto-scroll, instant send
+- Sonora Admin: buttons follow the user state (Ban / Unban, Suspend / Remove suspension, ...), the admin can no longer ban or suspend themselves
 - Sonora Admin: tickets chat, reports from moderators, moderator tag
 
 ## Part 4

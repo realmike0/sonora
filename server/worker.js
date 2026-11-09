@@ -714,6 +714,7 @@ async function adminRoutes(req, env, path, url) {
     const b = await req.json();
     const uid = typeof b.user === "string" && /^[\w-]{6,80}$/.test(b.user) ? b.user : null;
     if (!uid) return err("Utente non valido");
+    if (isAdminUid(uid) && ["ban", "suspend", "mod", "unmod"].includes(b.action)) return err("Questa azione non vale per l'admin");
     if (b.action === "mod") { await env.DB.prepare("INSERT OR IGNORE INTO sid_mod(user_id,since) VALUES(?,?)").bind(uid, Date.now()).run(); return J({ ok: true }); }
     if (b.action === "unmod") { await env.DB.prepare("DELETE FROM sid_mod WHERE user_id=?").bind(uid).run(); return J({ ok: true }); }
     return await userAction(env, uid, b.action, { days: b.days, text: b.text, from: "Sonora" });

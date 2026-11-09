@@ -12,6 +12,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -156,7 +160,7 @@ private fun Main(key: String, onLogout: () -> Unit) {
             )
         },
         bottomBar = {
-            NavigationBar {
+            if (!(tab == 3 && openTicket != null)) NavigationBar {
                 NavigationBarItem(tab == 0, { tab = 0 }, { Icon(Icons.Rounded.People, null) }, label = { Text("Utenti") })
                 NavigationBarItem(tab == 1, { tab = 1 }, { Icon(Icons.Rounded.Forum, null) }, label = { Text("Commenti") })
                 NavigationBarItem(tab == 2, { tab = 2 }, { Icon(Icons.Rounded.Favorite, null) }, label = { Text("Dediche") })
@@ -165,7 +169,7 @@ private fun Main(key: String, onLogout: () -> Unit) {
             }
         }
     ) { pad ->
-        Column(Modifier.padding(pad).fillMaxSize()) {
+        Column(Modifier.padding(pad).consumeWindowInsets(pad).imePadding().fillMaxSize()) {
             when (tab) {
                 0 -> UsersTab(key, reload) { actionUser = it }
                 1 -> CommentsTab(key, reload) { actionUser = it }
@@ -307,40 +311,100 @@ private fun DedsTab(key: String, reload: Int, onUser: (String) -> Unit) {
     }
 }
 
-/** Azioni su un utente: ban, sospensione, reclamo. */
+/** Azioni su un utente. I pulsanti seguono lo stato: se è bannato vedi "Togli ban", se è sospeso "Togli sospensione", ecc. */
 @Composable
 private fun UserSheet(key: String, id: String, onDone: () -> Unit, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
+    var user by remember { mutableStateOf<UserRow?>(null) }
     var msg by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
     var warn by remember { mutableStateOf(false) }
     var warnText by remember { mutableStateOf("") }
     var suspend by remember { mutableStateOf(false) }
+    var bump by remember { mutableIntStateOf(0) }
+    LaunchedEffect(bump) {
+        user = runCatching { AdminApi.users(key, id).firstOrNull { it.id == id } }.getOrNull() ?: user
+    }
     fun act(body: JSONObject) {
+        if (busy) return
+        busy = true
         scope.launch {
-            msg = try { AdminApi.call(key, "POST", "/v1/admin/user", body.put("user", id)); onDone(); "Fatto" } catch (e: Exception) { e.message }
+            msg = try { AdminApi.call(key, "POST", "/v1/admin/user", body.put("user", id)); onDone(); bump++; "Fatto" } catch (e: Exception) { e.message }
+            busy = false
         }
     }
+    val u = user
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Utente ${id.take(8)}", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
-            if (warn) {
+            Text(
+                (u?.name?.ifBlank { null } ?: "Utente") + " · " + id.take(8),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+            )
+            if (u != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (u.admin) AssistChip({}, { Text("admin") })
+                    if (u.mod > 0) AssistChip({}, { Text("moderatore") })
+                    if (u.banned) AssistChip({}, { Text("bannato") })
+                    if (u.until > System.currentTimeMillis()) AssistChip({}, { Text("sospeso fino al ${date(u.until)}") })
+                }
+            }
+            if (u == null) {
+                CircularProgressIndicator()
+            } else if (warn) {
                 OutlinedTextField(warnText, { warnText = it }, label = { Text("Reclamo (lo vede in app e per email)") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
-                Button({ act(JSONObject().put("action", "warn").put("text", warnText)); warn = false; warnText = "" }, enabled = warnText.length >= 3, modifier = Modifier.fillMaxWidth()) { Text("Invia reclamo") }
+                Button({ act(JSONObject().put("action", "warn").put("text", warnText)); warn = false; warnText = "" }, enabled = warnText.length >= 3 && !busy, modifier = Modifier.fillMaxWidth()) { Text("Invia reclamo") }
+                OutlinedButton({ warn = false }, modifier = Modifier.fillMaxWidth()) { Text("Annulla") }
             } else if (suspend) {
                 Text("Per quanti giorni?")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(1, 7, 30).forEach { d -> FilledTonalButton({ act(JSONObject().put("action", "suspend").put("days", d)); suspend = false }) { Text("$d g") } }
+                    listOf(1, 7, 30).forEach { d -> FilledTonalButton({ act(JSONObject().put("action", "suspend").put("days", d)); suspend = false }, enabled = !busy) { Text("$d g") } }
                 }
+                OutlinedButton({ suspend = false }, modifier = Modifier.fillMaxWidth()) { Text("Annulla") }
             } else {
                 Button({ warn = true }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Invia reclamo") }
-                FilledTonalButton({ suspend = true }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Sospendi") }
-                OutlinedButton({ act(JSONObject().put("action", "unsuspend")) }, modifier = Modifier.fillMaxWidth()) { Text("Togli sospensione") }
-                FilledTonalButton({ act(JSONObject().put("action", "mod")) }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Rendi moderatore") }
-                OutlinedButton({ act(JSONObject().put("action", "unmod")) }, modifier = Modifier.fillMaxWidth()) { Text("Togli moderatore") }
-                FilledTonalButton({ act(JSONObject().put("action", "ban")) }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Banna") }
-                OutlinedButton({ act(JSONObject().put("action", "unban")) }, modifier = Modifier.fillMaxWidth()) { Text("Togli ban") }
+                if (u.admin) {
+                    Text("Questo sei tu: l'admin non si può bannare, sospendere o togliere dai moderatori.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    if (u.until > System.currentTimeMillis()) {
+                        OutlinedButton({ act(JSONObject().put("action", "unsuspend")) }, enabled = !busy, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Togli sospensione") }
+                    } else {
+                        FilledTonalButton({ suspend = true }, enabled = !busy, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Sospendi") }
+                    }
+                    if (u.mod > 0) {
+                        OutlinedButton({ act(JSONObject().put("action", "unmod")) }, enabled = !busy, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Togli moderatore") }
+                    } else {
+                        FilledTonalButton({ act(JSONObject().put("action", "mod")) }, enabled = !busy, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Rendi moderatore") }
+                    }
+                    if (u.banned) {
+                        OutlinedButton({ act(JSONObject().put("action", "unban")) }, enabled = !busy, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Togli ban") }
+                    } else {
+                        FilledTonalButton({ act(JSONObject().put("action", "ban")) }, enabled = !busy, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Banna") }
+                    }
+                }
             }
             msg?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+        }
+    }
+}
+
+/** Campo di scrittura da chat: a pillola, cresce fino a 5 righe e con il pulsante di invio tondo. */
+@Composable
+private fun ChatInput(text: String, onText: (String) -> Unit, placeholder: String, onSend: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        androidx.compose.material3.TextField(
+            value = text, onValueChange = onText, placeholder = { Text(placeholder) },
+            maxLines = 5, shape = RoundedCornerShape(26.dp),
+            colors = androidx.compose.material3.TextFieldDefaults.colors(
+                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            ),
+            modifier = Modifier.weight(1f)
+        )
+        androidx.compose.material3.FilledIconButton(onClick = onSend, enabled = text.isNotBlank(), modifier = Modifier.size(52.dp)) {
+            Icon(Icons.AutoMirrored.Rounded.Send, "Invia")
         }
     }
 }
@@ -360,7 +424,7 @@ private fun TicketsTab(key: String, reload: Int, onOpen: (TicketRow) -> Unit) {
     }
 }
 
-/** Chat di un ticket: l'utente scrive dall'app, tu rispondi da qui. */
+/** Chat di un ticket: l'utente scrive dall'app, tu rispondi da qui. Il campo resta sopra la tastiera. */
 @Composable
 private fun TicketChat(key: String, t: TicketRow, onUser: (String) -> Unit, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
@@ -370,47 +434,47 @@ private fun TicketChat(key: String, t: TicketRow, onUser: (String) -> Unit, onBa
     var bump by remember { mutableIntStateOf(0) }
     var open by remember { mutableStateOf(t.open) }
     var error by remember { mutableStateOf<String?>(null) }
+    val list = androidx.compose.foundation.lazy.rememberLazyListState()
     LaunchedEffect(bump) {
         while (true) {
             runCatching { AdminApi.ticket(key, t.id) }.onSuccess { user = it.first; msgs = it.second }
-            kotlinx.coroutines.delay(8000)
+            kotlinx.coroutines.delay(6000)
         }
     }
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LaunchedEffect(msgs.size) { if (msgs.isNotEmpty()) list.animateScrollToItem(msgs.lastIndex) }
+    Column(Modifier.fillMaxSize().padding(horizontal = 12.dp).padding(top = 4.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onBack) { Text("Indietro") }
-            Text(t.subject, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text(t.subject, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), maxLines = 1)
             OutlinedButton({ onUser(user) }) { Text("Utente") }
         }
-        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
             items(msgs.size) { i ->
                 val m = msgs[i]
                 val mine = m.side == "admin"
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
                     Surface(
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = if (mine) 20.dp else 4.dp, bottomEnd = if (mine) 4.dp else 20.dp),
                         color = if (mine) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.fillMaxWidth(0.84f)
-                    ) { Column(Modifier.padding(12.dp)) { Text(m.text); Text(date(m.ts), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+                        modifier = Modifier.fillMaxWidth(0.82f)
+                    ) { Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) { Text(m.text); Text(date(m.ts), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
                 }
             }
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (open) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(text, { text = it.take(1000) }, placeholder = { Text("Rispondi…") }, modifier = Modifier.weight(1f))
-                Button(enabled = text.isNotBlank(), onClick = {
-                    val send = text; text = ""
-                    scope.launch {
-                        try { AdminApi.call(key, "POST", "/v1/admin/tickets/${t.id}/msg", JSONObject().put("text", send)); bump++ }
-                        catch (e: Exception) { error = e.message; text = send }
-                    }
-                }) { Text("Invia") }
+            ChatInput(text, { text = it.take(1000) }, "Rispondi…") {
+                val send = text.trim(); text = ""
+                msgs = msgs + TicketMsg("admin", send, System.currentTimeMillis())
+                scope.launch {
+                    try { AdminApi.call(key, "POST", "/v1/admin/tickets/${t.id}/msg", JSONObject().put("text", send)); bump++ }
+                    catch (e: Exception) { error = e.message; text = send }
+                }
             }
-            OutlinedButton({
+            TextButton({
                 scope.launch { runCatching { AdminApi.call(key, "POST", "/v1/admin/tickets/${t.id}/close", JSONObject()) }; open = false }
-            }, modifier = Modifier.fillMaxWidth()) { Text("Chiudi ticket") }
-        } else Text("Ticket chiuso", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Chiudi ticket") }
+        } else Text("Ticket chiuso", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(8.dp))
     }
 }
 

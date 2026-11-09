@@ -266,6 +266,17 @@ private fun SettingsPage(vm: PlayerViewModel, page: String, onBack: () -> Unit, 
         "manage" -> tr("Gestisci"); "inbox" -> tr("Posta in arrivo"); "style" -> tr("Style"); "player" -> tr("Player")
         "advanced" -> tr("Advanced"); "languages" -> tr("Languages"); else -> tr("Info")
     }
+    if (page == "inbox") {
+        // La posta ha il suo scorrimento (e la chat il campo fisso sopra la tastiera): niente scroll della pagina.
+        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = tr("Indietro")) }
+                Text(title, style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold))
+            }
+            InboxPage(startNew, Modifier.weight(1f).fillMaxWidth())
+        }
+        return
+    }
     Column(
         Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState())
             .padding(start = 20.dp, end = 20.dp, bottom = 64.dp),
@@ -276,7 +287,6 @@ private fun SettingsPage(vm: PlayerViewModel, page: String, onBack: () -> Unit, 
             Text(title, style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold))
         }
         when (page) {
-            "inbox" -> InboxPage(startNew)
             "manage" -> SettingsCard(tr("Profilo")) {
                 GoogleSection(vm)
                 SonoraIdSection(vm)
