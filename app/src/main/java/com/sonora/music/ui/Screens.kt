@@ -188,6 +188,7 @@ fun SonoraRoot(vm: PlayerViewModel) {
         }
 
         if (vm.store.onboarded && !splash) FrameworkPrompt()
+        if (vm.store.onboarded && !splash) NoticeDialog()
 
         if (vm.wrappedOpen) WrappedScreen(vm, onClose = { vm.wrappedOpen = false })
 

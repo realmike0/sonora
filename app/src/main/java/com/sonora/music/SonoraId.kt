@@ -251,4 +251,11 @@ object SonoraId {
             Upcoming(o.optString("id"), o.optString("artist"), o.optString("album"), o.optString("cover").ifEmpty { null }, o.optLong("release"))
         }
     }
+
+    /** Avvisi (reclami) mandati dagli amministratori: si leggono una volta sola. */
+    suspend fun notices(c: Context): List<String> {
+        val r = call(c, "GET", "/v1/id/notices", null, auth = true)
+        val a = r.optJSONArray("items") ?: JSONArray()
+        return (0 until a.length()).map { a.getJSONObject(it).optString("text") }
+    }
 }

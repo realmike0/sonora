@@ -22,3 +22,6 @@ CREATE TABLE IF NOT EXISTS sid_comments (id TEXT PRIMARY KEY, track_id TEXT NOT 
 CREATE INDEX IF NOT EXISTS idx_comments_track ON sid_comments(track_id, ts);
 CREATE TABLE IF NOT EXISTS sid_comm_reports (comment_id TEXT NOT NULL, user_id TEXT NOT NULL, PRIMARY KEY(comment_id, user_id));
 CREATE TABLE IF NOT EXISTS sid_upcoming (id TEXT PRIMARY KEY, artist TEXT NOT NULL, album TEXT NOT NULL, cover TEXT, release_ts INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS sid_susp (user_id TEXT PRIMARY KEY, until INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS sid_notice (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, text TEXT NOT NULL, ts INTEGER NOT NULL, seen INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX IF NOT EXISTS idx_notice_user ON sid_notice(user_id, seen);

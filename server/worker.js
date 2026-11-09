@@ -76,6 +76,12 @@ async function issueCode(env, uid, email) {
   return sendMail(env, email, "Verifica il tuo Sonora ID", `Il tuo codice di verifica Sonora è ${code}. Vale 10 minuti. Se non l'hai richiesto, ignora questa email.`);
 }
 const isBanned = async (env, k) => !!(k && (await env.DB.prepare("SELECT 1 FROM sid_ban WHERE k=?").bind(k).first()));
+// Sospensione temporanea: restituisce la data di fine (ms) se l'utente è sospeso, altrimenti 0.
+const suspendedUntil = async (env, uid) => {
+  const r = await env.DB.prepare("SELECT until FROM sid_susp WHERE user_id=?").bind(uid).first();
+  return r && r.until > Date.now() ? r.until : 0;
+};
+const suspMsg = (until) => "Account sospeso fino al " + new Date(until).toLocaleDateString("it-IT");
 const isVerified = async (env, uid) => {
   const m = await env.DB.prepare("SELECT verified FROM sid_mail WHERE user_id=?").bind(uid).first();
   return !!(m && m.verified);
@@ -398,6 +404,8 @@ async function dedRoutes(req, env, path) {
   }
   if (req.method === "POST" && path === "/v1/id/ded") {
     if (!(await isVerified(env, uid))) return err("Verifica la tua email per scrivere dediche", 403);
+    const susp = await suspendedUntil(env, uid);
+    if (susp) return err(suspMsg(susp), 403);
     const iph = keyReady(env) ? await hmac(env, "ip:" + (req.headers.get("cf-connecting-ip") || "x")) : "";
     if ((await isBanned(env, "user:" + uid)) || (await isBanned(env, "ip:" + iph))) return err("Non puoi scrivere dediche", 403);
     if (await tooMany(env, "ded:" + uid, 5)) return err("Troppe dediche, riprova più tardi", 429);
@@ -457,6 +465,8 @@ async function commentRoutes(req, env, path, url) {
   if (!uid) return err("Accedi con Sonora ID", 401);
   if (req.method === "POST" && path === "/v1/id/comments") {
     if (!(await isVerified(env, uid))) return err("Verifica la tua email per commentare", 403);
+    const susp = await suspendedUntil(env, uid);
+    if (susp) return err(suspMsg(susp), 403);
     const iph = keyReady(env) ? await hmac(env, "ip:" + (req.headers.get("cf-connecting-ip") || "x")) : "";
     if ((await isBanned(env, "user:" + uid)) || (await isBanned(env, "ip:" + iph))) return err("Non puoi commentare", 403);
     if (await tooMany(env, "com:" + uid, 20)) return err("Troppi commenti, riprova più tardi", 429);
@@ -530,6 +540,62 @@ async function adminRoutes(req, env, path, url) {
       for (const key of keys) { await env.DB.prepare("INSERT OR IGNORE INTO sid_ban(k,ts) VALUES(?,?)").bind(key, Date.now()).run(); banned++; }
     }
     return J({ deleted: list.length, banned });
+  }
+  if (req.method === "GET" && path === "/v1/admin/users") {
+    const lim = Math.min(200, parseInt(url.searchParams.get("limit")) || 60);
+    const q = (url.searchParams.get("q") || "").replace(/[^a-f0-9]/gi, "").toLowerCase();
+    const rows = await env.DB.prepare(
+      `SELECT u.user_id, u.created, m.verified,
+        (SELECT COUNT(*) FROM sid_comments c WHERE c.user_id=u.user_id) AS comments,
+        (SELECT COUNT(*) FROM sid_ded d WHERE d.user_id=u.user_id) AS deds,
+        (SELECT name FROM sid_comments c WHERE c.user_id=u.user_id ORDER BY ts DESC LIMIT 1) AS cname,
+        (SELECT from_name FROM sid_ded d WHERE d.user_id=u.user_id ORDER BY ts DESC LIMIT 1) AS dname,
+        (SELECT 1 FROM sid_ban b WHERE b.k='user:' || u.user_id) AS banned,
+        (SELECT until FROM sid_susp s WHERE s.user_id=u.user_id) AS until
+       FROM sid_users u LEFT JOIN sid_mail m ON m.user_id=u.user_id
+       WHERE u.user_id LIKE ? ORDER BY u.created DESC LIMIT ?`
+    ).bind(q + "%", lim).all();
+    return J({ items: rows.results.map((r) => ({
+      id: r.user_id, created: r.created, verified: !!r.verified, comments: r.comments, deds: r.deds,
+      name: r.cname || r.dname || "", banned: !!r.banned, until: r.until && r.until > Date.now() ? r.until : 0,
+    })) });
+  }
+  if (req.method === "GET" && path === "/v1/admin/comments") {
+    const lim = Math.min(200, parseInt(url.searchParams.get("limit")) || 60);
+    const rows = await env.DB.prepare(
+      "SELECT c.id,c.track_id,c.user_id,c.name,c.text,c.ts,c.hidden,(SELECT COUNT(*) FROM sid_comm_reports r WHERE r.comment_id=c.id) AS reports FROM sid_comments c ORDER BY c.ts DESC LIMIT ?"
+    ).bind(lim).all();
+    return J({ items: rows.results.map((r) => ({ id: r.id, track: r.track_id, user: r.user_id, name: r.name, text: r.text, ts: r.ts, hidden: r.hidden, reports: r.reports })) });
+  }
+  if (req.method === "POST" && path === "/v1/admin/comment-rm") {
+    const b = await req.json();
+    if (typeof b.id !== "string") return err("Manca id");
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM sid_comments WHERE id=?").bind(b.id),
+      env.DB.prepare("DELETE FROM sid_comm_reports WHERE comment_id=?").bind(b.id),
+    ]);
+    return J({ ok: true });
+  }
+  if (req.method === "POST" && path === "/v1/admin/user") {
+    const b = await req.json();
+    const uid = typeof b.user === "string" && /^[a-f0-9]{8,64}$/.test(b.user) ? b.user : null;
+    if (!uid) return err("Utente non valido");
+    const k = "user:" + uid;
+    if (b.action === "ban") await env.DB.prepare("INSERT OR IGNORE INTO sid_ban(k,ts) VALUES(?,?)").bind(k, Date.now()).run();
+    else if (b.action === "unban") await env.DB.prepare("DELETE FROM sid_ban WHERE k=?").bind(k).run();
+    else if (b.action === "suspend") {
+      const days = Math.max(1, Math.min(365, parseInt(b.days) || 7));
+      await env.DB.prepare("INSERT INTO sid_susp(user_id,until) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET until=excluded.until").bind(uid, Date.now() + days * 86400000).run();
+    } else if (b.action === "unsuspend") await env.DB.prepare("DELETE FROM sid_susp WHERE user_id=?").bind(uid).run();
+    else if (b.action === "warn") {
+      const text = clean(b.text, 500);
+      if (text.length < 3) return err("Scrivi il reclamo");
+      await env.DB.prepare("INSERT INTO sid_notice(id,user_id,text,ts) VALUES(?,?,?,?)").bind(rnd(8), uid, text, Date.now()).run();
+      // In più, se l'email è verificata, arriva anche per posta.
+      const mm = await env.DB.prepare("SELECT email_enc,verified FROM sid_mail WHERE user_id=?").bind(uid).first();
+      if (mm && mm.verified && keyReady(env)) sendMail(env, await unseal(env, mm.email_enc), "Un avviso da Sonora", text + "\n\nSe pensi sia un errore scrivici su Telegram: t.me/sonoraclient").catch(() => 0);
+    } else return err("Azione non valida");
+    return J({ ok: true });
   }
   if (req.method === "POST" && path === "/v1/admin/upcoming") {
     const b = await req.json();
@@ -795,6 +861,14 @@ export default {
       if (req.method === "GET" && path === "/v1/upcoming") {
         const rows = await env.DB.prepare("SELECT id,artist,album,cover,release_ts FROM sid_upcoming WHERE release_ts>? ORDER BY release_ts ASC LIMIT 30").bind(Date.now()).all();
         return J({ items: rows.results.map((r) => ({ id: r.id, artist: r.artist, album: r.album, cover: r.cover, release: r.release_ts })) });
+      }
+      if (req.method === "GET" && path === "/v1/id/notices") {
+        const uid = await sidFrom(req, env);
+        if (!uid) return err("Accedi con Sonora ID", 401);
+        const rows = await env.DB.prepare("SELECT id,text,ts FROM sid_notice WHERE user_id=? AND seen=0 ORDER BY ts ASC LIMIT 5").bind(uid).all();
+        if (rows.results.length) await env.DB.prepare("UPDATE sid_notice SET seen=1 WHERE user_id=? AND seen=0").bind(uid).run();
+        const until = await suspendedUntil(env, uid);
+        return J({ items: rows.results.map((r) => ({ id: r.id, text: r.text, ts: r.ts })), suspended: until });
       }
       if (path === "/v1/comments" || path.startsWith("/v1/id/comments")) return await commentRoutes(req, env, path, url);
       if (path.startsWith("/v1/id/ded")) return await dedRoutes(req, env, path);

@@ -137,3 +137,21 @@ fun FavoritesPage(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit.Dp, o
         item { UpcomingShelf(Modifier.fillMaxWidth()) }
     }
 }
+
+/** Mostra gli avvisi mandati dall'amministrazione (per esempio un reclamo sul comportamento). */
+@Composable
+fun NoticeDialog() {
+    val context = LocalContext.current
+    var texts by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(SonoraId.signedIn) {
+        if (SonoraId.signedIn) texts = runCatching { SonoraId.notices(context) }.getOrDefault(emptyList())
+    }
+    if (texts.isNotEmpty()) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { texts = emptyList() },
+            title = { Text(tr("Avviso da Sonora")) },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { texts.forEach { Text(it) } } },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { texts = emptyList() }) { Text("OK") } }
+        )
+    }
+}

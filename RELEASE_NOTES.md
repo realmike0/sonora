@@ -1,4 +1,11 @@
-## Sonora 0.90-beta (part 3)
+## Sonora 0.90-beta (part 4)
+
+**New**
+- Sonora Admin: a small separate app to manage users, comments and dedications (private build)
+- Users can be banned, suspended for N days, or sent a complaint (shown inside Sonora and sent by email if verified)
+- Suspended accounts can't comment or dedicate
+
+## Part 3
 
 **New**
 - Comments with Sonora ID: a "Sonora" tab next to the YouTube one, checked by AI before publishing (report / delete your own)
