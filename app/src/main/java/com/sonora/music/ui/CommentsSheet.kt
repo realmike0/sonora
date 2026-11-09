@@ -166,6 +166,7 @@ private fun SonoraComments(vm: PlayerViewModel, trackId: String) {
     var text by remember { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf<String?>(null) }
+    var modDialog by remember { mutableStateOf<Pair<com.sonora.music.SonoraId.SonoraComment, String>?>(null) }
     LaunchedEffect(trackId, reload) {
         list = runCatching { com.sonora.music.SonoraId.comments(context, trackId) }.getOrDefault(emptyList())
     }
@@ -183,10 +184,35 @@ private fun SonoraComments(vm: PlayerViewModel, trackId: String) {
                         ) { Text(c.name.take(1).uppercase(), color = MaterialTheme.colorScheme.onPrimaryContainer) }
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(c.name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(c.name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (c.role != "user") {
+                                    Spacer(Modifier.width(6.dp))
+                                    ModBadge(c.role, c.since, 16.dp)
+                                }
+                            }
                             Text(c.text, style = MaterialTheme.typography.bodyMedium)
                         }
-                        androidx.compose.material3.TextButton(onClick = {
+                        if (com.sonora.music.SonoraId.isMod && !c.mine) {
+                            var menu by remember { mutableStateOf(false) }
+                            Box {
+                                androidx.compose.material3.TextButton(onClick = { menu = true }) { Text(tr("Modera"), style = MaterialTheme.typography.labelSmall) }
+                                androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                    fun run(action: String, days: Int = 0) {
+                                        menu = false
+                                        scope.launch {
+                                            info = try { com.sonora.music.SonoraId.modAct(context, c.id, action, days); reload++; "Fatto" } catch (e: Exception) { e.message }
+                                        }
+                                    }
+                                    androidx.compose.material3.DropdownMenuItem(text = { Text(tr("Rimuovi commento")) }, onClick = { run("remove") })
+                                    androidx.compose.material3.DropdownMenuItem(text = { Text(tr("Sospendi 1 giorno")) }, onClick = { run("suspend", 1) })
+                                    androidx.compose.material3.DropdownMenuItem(text = { Text(tr("Sospendi 3 giorni")) }, onClick = { run("suspend", 3) })
+                                    androidx.compose.material3.DropdownMenuItem(text = { Text(tr("Sospendi 7 giorni")) }, onClick = { run("suspend", 7) })
+                                    androidx.compose.material3.DropdownMenuItem(text = { Text(tr("Invia reclamo")) }, onClick = { menu = false; modDialog = c to "warn" })
+                                    androidx.compose.material3.DropdownMenuItem(text = { Text(tr("Segnala all'admin")) }, onClick = { menu = false; modDialog = c to "report" })
+                                }
+                            }
+                        } else androidx.compose.material3.TextButton(onClick = {
                             scope.launch {
                                 runCatching {
                                     if (c.mine) com.sonora.music.SonoraId.deleteComment(context, c.id)
@@ -200,6 +226,23 @@ private fun SonoraComments(vm: PlayerViewModel, trackId: String) {
                 }
             }
         }
+    }
+    modDialog?.let { (c, action) ->
+        var msg by remember { mutableStateOf("") }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { modDialog = null },
+            title = { Text(tr(if (action == "warn") "Invia reclamo" else "Segnala all'admin")) },
+            text = { OutlinedTextField(msg, { msg = it.take(400) }, minLines = 3, placeholder = { Text(tr(if (action == "warn") "Cosa ha sbagliato?" else "Perché lo segnali?")) }) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(enabled = msg.length >= 3, onClick = {
+                    modDialog = null
+                    scope.launch {
+                        info = try { com.sonora.music.SonoraId.modAct(context, c.id, action, 0, msg); "Fatto" } catch (e: Exception) { e.message }
+                    }
+                }) { Text(tr("Invia")) }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { modDialog = null }) { Text(tr("Annulla")) } }
+        )
     }
     Spacer(Modifier.height(8.dp))
     when {

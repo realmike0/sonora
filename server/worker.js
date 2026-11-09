@@ -442,6 +442,133 @@ async function dedRoutes(req, env, path) {
 }
 
 
+// ───────── Ruoli (admin / moderatori), posta in arrivo, ticket ─────────
+const ADMIN_PREFIX = "sid_6aee"; // l'id che inizia così è sempre l'amministratore
+const isAdminUid = (uid) => !!uid && uid.startsWith(ADMIN_PREFIX);
+async function roleOf(env, uid) {
+  if (isAdminUid(uid)) return { role: "admin", since: 0 };
+  const m = uid ? await env.DB.prepare("SELECT since FROM sid_mod WHERE user_id=?").bind(uid).first() : null;
+  return m ? { role: "mod", since: m.since } : { role: "user", since: 0 };
+}
+async function notify(env, uid, kind, text) {
+  await env.DB.prepare("INSERT INTO sid_inbox(id,user_id,kind,text,ts) VALUES(?,?,?,?,?)").bind(rnd(8), uid, kind, clean(text, 600), Date.now()).run();
+}
+// Azioni sugli utenti, usate sia dall'app Admin sia dai moderatori (con limiti).
+async function userAction(env, uid, action, o) {
+  const k = "user:" + uid;
+  if (action === "ban") {
+    await env.DB.prepare("INSERT OR IGNORE INTO sid_ban(k,ts) VALUES(?,?)").bind(k, Date.now()).run();
+    await notify(env, uid, "ban", "Il tuo account è stato bannato: non puoi più commentare né scrivere dediche. Se pensi sia un errore, apri un ticket.");
+  } else if (action === "unban") {
+    await env.DB.prepare("DELETE FROM sid_ban WHERE k=?").bind(k).run();
+    await notify(env, uid, "info", "Il ban al tuo account è stato tolto.");
+  } else if (action === "suspend") {
+    const days = Math.max(1, Math.min(o.maxDays || 365, parseInt(o.days) || 7));
+    const until = Date.now() + days * 86400000;
+    await env.DB.prepare("INSERT INTO sid_susp(user_id,until) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET until=excluded.until").bind(uid, until).run();
+    await notify(env, uid, "suspend", "Il tuo account è sospeso fino al " + new Date(until).toLocaleDateString("it-IT") + ": non puoi commentare né scrivere dediche.");
+  } else if (action === "unsuspend") {
+    await env.DB.prepare("DELETE FROM sid_susp WHERE user_id=?").bind(uid).run();
+    await notify(env, uid, "info", "La sospensione del tuo account è stata tolta.");
+  } else if (action === "warn") {
+    const text = clean(o.text, 500);
+    if (text.length < 3) return err("Scrivi il reclamo");
+    await notify(env, uid, "warn", (o.from && o.from !== "Sonora" ? o.from + ": " : "") + text);
+    const mm = await env.DB.prepare("SELECT email_enc,verified FROM sid_mail WHERE user_id=?").bind(uid).first();
+    if (mm && mm.verified && keyReady(env)) sendMail(env, await unseal(env, mm.email_enc), "Un avviso da Sonora", text + "\n\nSe pensi sia un errore apri un ticket dall'app (Impostazioni → Posta in arrivo) o scrivici su Telegram: t.me/sonoraclient").catch(() => 0);
+  } else return err("Azione non valida");
+  return J({ ok: true });
+}
+async function inboxRoutes(req, env, path) {
+  const uid = await sidFrom(req, env);
+  if (!uid) return err("Accedi con Sonora ID", 401);
+  if (req.method === "GET" && path === "/v1/id/inbox") {
+    const rows = await env.DB.prepare("SELECT id,kind,text,ts,read FROM sid_inbox WHERE user_id=? ORDER BY ts DESC LIMIT 60").bind(uid).all();
+    return J({ items: rows.results.map((r) => ({ id: r.id, kind: r.kind, text: r.text, ts: r.ts, read: !!r.read })) });
+  }
+  if (req.method === "POST" && path === "/v1/id/inbox/read") {
+    await env.DB.prepare("UPDATE sid_inbox SET read=1 WHERE user_id=?").bind(uid).run();
+    return J({ ok: true });
+  }
+  return err("Non trovato", 404);
+}
+async function ticketRoutes(req, env, path) {
+  const uid = await sidFrom(req, env);
+  if (!uid) return err("Accedi con Sonora ID", 401);
+  if (req.method === "GET" && path === "/v1/id/tickets") {
+    const rows = await env.DB.prepare("SELECT id,subject,status,updated FROM sid_ticket WHERE user_id=? ORDER BY updated DESC LIMIT 30").bind(uid).all();
+    return J({ items: rows.results });
+  }
+  if (req.method === "POST" && path === "/v1/id/tickets") {
+    if (await tooMany(env, "tk:" + uid, 6)) return err("Troppi ticket, riprova più tardi", 429);
+    const open = await env.DB.prepare("SELECT COUNT(*) AS n FROM sid_ticket WHERE user_id=? AND status='open'").bind(uid).first();
+    if (open && open.n >= 3) return err("Hai già 3 ticket aperti");
+    const b = await req.json();
+    const subject = clean(b.subject, 80), text = clean(b.text, 1000);
+    if (subject.length < 3 || text.length < 3) return err("Scrivi oggetto e messaggio");
+    const id = rnd(8), now = Date.now();
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO sid_ticket(id,user_id,subject,status,created,updated,unread_admin) VALUES(?,?,?,?,?,?,1)").bind(id, uid, subject, "open", now, now),
+      env.DB.prepare("INSERT INTO sid_tmsg(id,ticket_id,side,text,ts) VALUES(?,?,?,?,?)").bind(rnd(8), id, "user", text, now),
+    ]);
+    return J({ ok: true, id });
+  }
+  const m = path.match(/^\/v1\/id\/tickets\/([a-f0-9]{16})(\/msg)?$/);
+  if (m) {
+    const t = await env.DB.prepare("SELECT id,subject,status FROM sid_ticket WHERE id=? AND user_id=?").bind(m[1], uid).first();
+    if (!t) return err("Ticket non trovato", 404);
+    if (req.method === "GET" && !m[2]) {
+      const rows = await env.DB.prepare("SELECT side,text,ts FROM sid_tmsg WHERE ticket_id=? ORDER BY ts ASC LIMIT 300").bind(t.id).all();
+      return J({ id: t.id, subject: t.subject, status: t.status, messages: rows.results });
+    }
+    if (req.method === "POST" && m[2]) {
+      if (t.status !== "open") return err("Ticket chiuso");
+      if (await tooMany(env, "tkm:" + uid, 60)) return err("Troppi messaggi, riprova più tardi", 429);
+      const b = await req.json();
+      const text = clean(b.text, 1000);
+      if (text.length < 1) return err("Scrivi un messaggio");
+      const now = Date.now();
+      await env.DB.batch([
+        env.DB.prepare("INSERT INTO sid_tmsg(id,ticket_id,side,text,ts) VALUES(?,?,?,?,?)").bind(rnd(8), t.id, "user", text, now),
+        env.DB.prepare("UPDATE sid_ticket SET updated=?, unread_admin=1 WHERE id=?").bind(now, t.id),
+      ]);
+      return J({ ok: true });
+    }
+  }
+  return err("Non trovato", 404);
+}
+// Strumenti dei moderatori (e dell'admin dall'app): agiscono partendo da un commento.
+async function modRoutes(req, env, path) {
+  const uid = await sidFrom(req, env);
+  if (!uid) return err("Accedi con Sonora ID", 401);
+  const me = await roleOf(env, uid);
+  if (me.role === "user") return err("Non sei un moderatore", 403);
+  if (req.method !== "POST" || path !== "/v1/id/mod/act") return err("Non trovato", 404);
+  const b = await req.json();
+  const c = await env.DB.prepare("SELECT id,user_id,name,text FROM sid_comments WHERE id=?").bind(String(b.comment)).first();
+  if (!c) return err("Commento non trovato", 404);
+  const target = c.user_id;
+  const tr = await roleOf(env, target);
+  const action = b.action;
+  if (action === "report") {
+    const text = clean(b.text, 400);
+    await env.DB.prepare("INSERT INTO sid_modreport(id,reporter,target,comment_id,comment_text,text,ts,status) VALUES(?,?,?,?,?,?,?,0)").bind(rnd(8), uid, target, c.id, c.text, text, Date.now()).run();
+    return J({ ok: true });
+  }
+  if (tr.role === "admin" || (tr.role === "mod" && me.role !== "admin")) return err("Non puoi agire su questo utente", 403);
+  if (target === uid) return err("Non su te stesso", 403);
+  if (action === "remove") {
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM sid_comments WHERE id=?").bind(c.id),
+      env.DB.prepare("DELETE FROM sid_comm_rep2 WHERE comment_id=?").bind(c.id),
+    ]);
+    return J({ ok: true });
+  }
+  if (action === "suspend") return await userAction(env, target, "suspend", { days: b.days, maxDays: me.role === "admin" ? 365 : 7 });
+  if (action === "warn") return await userAction(env, target, "warn", { text: b.text, from: "Moderatore" });
+  return err("Azione non valida");
+}
+
 // ───────── Commenti Sonora (con Sonora ID, moderati dall'AI) + album in attesa ─────────
 const MOD_SYSTEM = "Sei un moderatore di commenti sotto le canzoni. Rispondi SOLO con JSON {\"ok\":true} oppure {\"ok\":false,\"why\":\"motivo breve\"}. Rifiuta: insulti e offese, odio o discriminazione, minacce, molestie, contenuti sessuali espliciti, spam, pubblicità, link o contatti. Accetta opinioni sulla musica, anche critiche educate, e frasi in qualunque lingua.";
 async function moderate(env, text) {
@@ -457,9 +584,13 @@ async function commentRoutes(req, env, path, url) {
   if (req.method === "GET" && path === "/v1/comments") {
     const track = clean(url.searchParams.get("track"), 20);
     if (!/^[\w-]{11}$/.test(track)) return J({ items: [] });
-    const rows = await env.DB.prepare("SELECT id,user_id,name,text,ts FROM sid_comments WHERE track_id=? AND hidden=0 ORDER BY ts DESC LIMIT 80").bind(track).all();
+    const rows = await env.DB.prepare("SELECT c.id,c.user_id,c.name,c.text,c.ts,m.since AS msince FROM sid_comments c LEFT JOIN sid_mod m ON m.user_id=c.user_id WHERE c.track_id=? AND c.hidden=0 ORDER BY c.ts DESC LIMIT 80").bind(track).all();
     const uid = await sidFrom(req, env);
-    return J({ items: rows.results.map((r) => ({ id: r.id, name: r.name, text: r.text, ts: r.ts, mine: !!uid && r.user_id === uid })) });
+    const me = uid ? await roleOf(env, uid) : { role: "user" };
+    return J({ me: me.role, items: rows.results.map((r) => ({
+      id: r.id, name: r.name, text: r.text, ts: r.ts, mine: !!uid && r.user_id === uid,
+      role: isAdminUid(r.user_id) ? "admin" : r.msince ? "mod" : "user", since: r.msince || 0,
+    })) });
   }
   const uid = await sidFrom(req, env);
   if (!uid) return err("Accedi con Sonora ID", 401);
@@ -487,8 +618,10 @@ async function commentRoutes(req, env, path, url) {
       return J({ ok: true });
     }
     if (req.method === "POST" && m[2]) {
-      await env.DB.prepare("INSERT OR IGNORE INTO sid_comm_reports(comment_id,user_id) VALUES(?,?)").bind(m[1], uid).run();
-      const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM sid_comm_reports WHERE comment_id=?").bind(m[1]).first();
+      // Le segnalazioni pesano in base a chi le fa: l'admin conta moltissimo, un moderatore di più di un utente.
+      const w = (await roleOf(env, uid)).role === "admin" ? 99 : (await roleOf(env, uid)).role === "mod" ? 2 : 1;
+      await env.DB.prepare("INSERT OR IGNORE INTO sid_comm_rep2(comment_id,user_id,w) VALUES(?,?,?)").bind(m[1], uid, w).run();
+      const n = await env.DB.prepare("SELECT COALESCE(SUM(w),0) AS n FROM sid_comm_rep2 WHERE comment_id=?").bind(m[1]).first();
       if (n && n.n >= 3) await env.DB.prepare("UPDATE sid_comments SET hidden=1 WHERE id=?").bind(m[1]).run();
       return J({ ok: true });
     }
@@ -551,19 +684,20 @@ async function adminRoutes(req, env, path, url) {
         (SELECT name FROM sid_comments c WHERE c.user_id=u.user_id ORDER BY ts DESC LIMIT 1) AS cname,
         (SELECT from_name FROM sid_ded d WHERE d.user_id=u.user_id ORDER BY ts DESC LIMIT 1) AS dname,
         (SELECT 1 FROM sid_ban b WHERE b.k='user:' || u.user_id) AS banned,
-        (SELECT until FROM sid_susp s WHERE s.user_id=u.user_id) AS until
+        (SELECT until FROM sid_susp s WHERE s.user_id=u.user_id) AS until,
+        (SELECT since FROM sid_mod x WHERE x.user_id=u.user_id) AS msince
        FROM sid_users u LEFT JOIN sid_mail m ON m.user_id=u.user_id
        WHERE u.user_id LIKE ? ORDER BY u.created DESC LIMIT ?`
     ).bind(q ? "sid_" + q + "%" : "%", lim).all();
     return J({ items: rows.results.map((r) => ({
       id: r.user_id, created: r.created, verified: !!r.verified, comments: r.comments, deds: r.deds,
-      name: r.cname || r.dname || "", banned: !!r.banned, until: r.until && r.until > Date.now() ? r.until : 0,
+      name: r.cname || r.dname || "", banned: !!r.banned, mod: r.msince || 0, admin: isAdminUid(r.user_id), until: r.until && r.until > Date.now() ? r.until : 0,
     })) });
   }
   if (req.method === "GET" && path === "/v1/admin/comments") {
     const lim = Math.min(200, parseInt(url.searchParams.get("limit")) || 60);
     const rows = await env.DB.prepare(
-      "SELECT c.id,c.track_id,c.user_id,c.name,c.text,c.ts,c.hidden,(SELECT COUNT(*) FROM sid_comm_reports r WHERE r.comment_id=c.id) AS reports FROM sid_comments c ORDER BY c.ts DESC LIMIT ?"
+      "SELECT c.id,c.track_id,c.user_id,c.name,c.text,c.ts,c.hidden,(SELECT COALESCE(SUM(w),0) FROM sid_comm_rep2 r WHERE r.comment_id=c.id) AS reports FROM sid_comments c ORDER BY c.ts DESC LIMIT ?"
     ).bind(lim).all();
     return J({ items: rows.results.map((r) => ({ id: r.id, track: r.track_id, user: r.user_id, name: r.name, text: r.text, ts: r.ts, hidden: r.hidden, reports: r.reports })) });
   }
@@ -572,7 +706,7 @@ async function adminRoutes(req, env, path, url) {
     if (typeof b.id !== "string") return err("Manca id");
     await env.DB.batch([
       env.DB.prepare("DELETE FROM sid_comments WHERE id=?").bind(b.id),
-      env.DB.prepare("DELETE FROM sid_comm_reports WHERE comment_id=?").bind(b.id),
+      env.DB.prepare("DELETE FROM sid_comm_rep2 WHERE comment_id=?").bind(b.id),
     ]);
     return J({ ok: true });
   }
@@ -580,22 +714,61 @@ async function adminRoutes(req, env, path, url) {
     const b = await req.json();
     const uid = typeof b.user === "string" && /^[\w-]{6,80}$/.test(b.user) ? b.user : null;
     if (!uid) return err("Utente non valido");
-    const k = "user:" + uid;
-    if (b.action === "ban") await env.DB.prepare("INSERT OR IGNORE INTO sid_ban(k,ts) VALUES(?,?)").bind(k, Date.now()).run();
-    else if (b.action === "unban") await env.DB.prepare("DELETE FROM sid_ban WHERE k=?").bind(k).run();
-    else if (b.action === "suspend") {
-      const days = Math.max(1, Math.min(365, parseInt(b.days) || 7));
-      await env.DB.prepare("INSERT INTO sid_susp(user_id,until) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET until=excluded.until").bind(uid, Date.now() + days * 86400000).run();
-    } else if (b.action === "unsuspend") await env.DB.prepare("DELETE FROM sid_susp WHERE user_id=?").bind(uid).run();
-    else if (b.action === "warn") {
-      const text = clean(b.text, 500);
-      if (text.length < 3) return err("Scrivi il reclamo");
-      await env.DB.prepare("INSERT INTO sid_notice(id,user_id,text,ts) VALUES(?,?,?,?)").bind(rnd(8), uid, text, Date.now()).run();
-      // In più, se l'email è verificata, arriva anche per posta.
-      const mm = await env.DB.prepare("SELECT email_enc,verified FROM sid_mail WHERE user_id=?").bind(uid).first();
-      if (mm && mm.verified && keyReady(env)) sendMail(env, await unseal(env, mm.email_enc), "Un avviso da Sonora", text + "\n\nSe pensi sia un errore scrivici su Telegram: t.me/sonoraclient").catch(() => 0);
-    } else return err("Azione non valida");
+    if (b.action === "mod") { await env.DB.prepare("INSERT OR IGNORE INTO sid_mod(user_id,since) VALUES(?,?)").bind(uid, Date.now()).run(); return J({ ok: true }); }
+    if (b.action === "unmod") { await env.DB.prepare("DELETE FROM sid_mod WHERE user_id=?").bind(uid).run(); return J({ ok: true }); }
+    return await userAction(env, uid, b.action, { days: b.days, text: b.text, from: "Sonora" });
+  }
+  if (req.method === "GET" && path === "/v1/admin/mods") {
+    const rows = await env.DB.prepare("SELECT user_id,since FROM sid_mod ORDER BY since ASC").all();
+    return J({ items: rows.results.map((r) => ({ id: r.user_id, since: r.since })) });
+  }
+  if (req.method === "GET" && path === "/v1/admin/reports") {
+    const rows = await env.DB.prepare("SELECT id,reporter,target,comment_id,comment_text,text,ts FROM sid_modreport WHERE status=0 ORDER BY ts DESC LIMIT 100").all();
+    return J({ items: rows.results.map((r) => ({ id: r.id, reporter: r.reporter, target: r.target, comment: r.comment_id, commentText: r.comment_text, text: r.text, ts: r.ts })) });
+  }
+  if (req.method === "POST" && path === "/v1/admin/report-resolve") {
+    const b = await req.json();
+    const r = await env.DB.prepare("SELECT comment_id FROM sid_modreport WHERE id=?").bind(String(b.id)).first();
+    if (!r) return err("Segnalazione non trovata", 404);
+    if (b.removeComment && r.comment_id) await env.DB.batch([
+      env.DB.prepare("DELETE FROM sid_comments WHERE id=?").bind(r.comment_id),
+      env.DB.prepare("DELETE FROM sid_comm_rep2 WHERE comment_id=?").bind(r.comment_id),
+    ]);
+    await env.DB.prepare("UPDATE sid_modreport SET status=1 WHERE id=?").bind(String(b.id)).run();
     return J({ ok: true });
+  }
+  if (req.method === "GET" && path === "/v1/admin/tickets") {
+    const rows = await env.DB.prepare(
+      "SELECT t.id,t.user_id,t.subject,t.status,t.updated,t.unread_admin,(SELECT text FROM sid_tmsg m WHERE m.ticket_id=t.id ORDER BY ts DESC LIMIT 1) AS last FROM sid_ticket t ORDER BY (t.status='open') DESC, t.updated DESC LIMIT 100"
+    ).all();
+    return J({ items: rows.results.map((r) => ({ id: r.id, user: r.user_id, subject: r.subject, status: r.status, updated: r.updated, unread: !!r.unread_admin, last: r.last || "" })) });
+  }
+  const tk = path.match(/^\/v1\/admin\/tickets\/([a-f0-9]{16})(\/msg|\/close)?$/);
+  if (tk) {
+    const t = await env.DB.prepare("SELECT id,user_id,subject,status FROM sid_ticket WHERE id=?").bind(tk[1]).first();
+    if (!t) return err("Ticket non trovato", 404);
+    if (req.method === "GET" && !tk[2]) {
+      const rows = await env.DB.prepare("SELECT side,text,ts FROM sid_tmsg WHERE ticket_id=? ORDER BY ts ASC LIMIT 300").bind(t.id).all();
+      await env.DB.prepare("UPDATE sid_ticket SET unread_admin=0 WHERE id=?").bind(t.id).run();
+      return J({ id: t.id, user: t.user_id, subject: t.subject, status: t.status, messages: rows.results });
+    }
+    if (req.method === "POST" && tk[2] === "/msg") {
+      const b = await req.json();
+      const text = clean(b.text, 1000);
+      if (text.length < 1) return err("Scrivi un messaggio");
+      const now = Date.now();
+      await env.DB.batch([
+        env.DB.prepare("INSERT INTO sid_tmsg(id,ticket_id,side,text,ts) VALUES(?,?,?,?,?)").bind(rnd(8), t.id, "admin", text, now),
+        env.DB.prepare("UPDATE sid_ticket SET updated=?, unread_admin=0 WHERE id=?").bind(now, t.id),
+      ]);
+      await notify(env, t.user_id, "ticket", "Nuova risposta al ticket «" + t.subject + "»");
+      return J({ ok: true });
+    }
+    if (req.method === "POST" && tk[2] === "/close") {
+      await env.DB.prepare("UPDATE sid_ticket SET status='closed', updated=? WHERE id=?").bind(Date.now(), t.id).run();
+      await notify(env, t.user_id, "info", "Il ticket «" + t.subject + "» è stato chiuso.");
+      return J({ ok: true });
+    }
   }
   if (req.method === "POST" && path === "/v1/admin/upcoming") {
     const b = await req.json();
@@ -865,11 +1038,15 @@ export default {
       if (req.method === "GET" && path === "/v1/id/notices") {
         const uid = await sidFrom(req, env);
         if (!uid) return err("Accedi con Sonora ID", 401);
-        const rows = await env.DB.prepare("SELECT id,text,ts FROM sid_notice WHERE user_id=? AND seen=0 ORDER BY ts ASC LIMIT 5").bind(uid).all();
-        if (rows.results.length) await env.DB.prepare("UPDATE sid_notice SET seen=1 WHERE user_id=? AND seen=0").bind(uid).run();
-        const until = await suspendedUntil(env, uid);
-        return J({ items: rows.results.map((r) => ({ id: r.id, text: r.text, ts: r.ts })), suspended: until });
+        const rows = await env.DB.prepare("SELECT id,kind,text,ts FROM sid_inbox WHERE user_id=? AND popup=1 ORDER BY ts ASC LIMIT 5").bind(uid).all();
+        if (rows.results.length) await env.DB.prepare("UPDATE sid_inbox SET popup=0 WHERE user_id=? AND popup=1").bind(uid).run();
+        const un = await env.DB.prepare("SELECT COUNT(*) AS n FROM sid_inbox WHERE user_id=? AND read=0").bind(uid).first();
+        const me = await roleOf(env, uid);
+        return J({ items: rows.results, suspended: await suspendedUntil(env, uid), unread: un ? un.n : 0, role: me.role, since: me.since });
       }
+      if (path.startsWith("/v1/id/inbox")) return await inboxRoutes(req, env, path);
+      if (path.startsWith("/v1/id/tickets")) return await ticketRoutes(req, env, path);
+      if (path.startsWith("/v1/id/mod/")) return await modRoutes(req, env, path);
       if (path === "/v1/comments" || path.startsWith("/v1/id/comments")) return await commentRoutes(req, env, path, url);
       if (path.startsWith("/v1/id/ded")) return await dedRoutes(req, env, path);
       if (path.startsWith("/v1/id")) return await sonoraId(req, env, path);

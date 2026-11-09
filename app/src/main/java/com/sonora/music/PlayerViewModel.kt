@@ -43,6 +43,8 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     var playerOpen by mutableStateOf(false)
     var loginOpen by mutableStateOf(false)
     var settingsOpen by mutableStateOf(false)
+    /** Pagina delle impostazioni da aprire subito: "inbox" oppure "ticket-new". */
+    var settingsStart by mutableStateOf<String?>(null)
     /** Artista aperto nella sua pagina (null = nessuna). */
     var artistOpen by mutableStateOf<String?>(null)
 

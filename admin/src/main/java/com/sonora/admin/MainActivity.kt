@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Chat
+import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.People
@@ -141,7 +143,8 @@ private fun Main(key: String, onLogout: () -> Unit) {
     var tab by remember { mutableIntStateOf(0) }
     var reload by remember { mutableIntStateOf(0) }
     var actionUser by remember { mutableStateOf<String?>(null) }
-    val titles = listOf("Utenti", "Commenti", "Dediche")
+    val titles = listOf("Utenti", "Commenti", "Dediche", "Ticket", "Segnalazioni")
+    var openTicket by remember { mutableStateOf<TicketRow?>(null) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -157,6 +160,8 @@ private fun Main(key: String, onLogout: () -> Unit) {
                 NavigationBarItem(tab == 0, { tab = 0 }, { Icon(Icons.Rounded.People, null) }, label = { Text("Utenti") })
                 NavigationBarItem(tab == 1, { tab = 1 }, { Icon(Icons.Rounded.Forum, null) }, label = { Text("Commenti") })
                 NavigationBarItem(tab == 2, { tab = 2 }, { Icon(Icons.Rounded.Favorite, null) }, label = { Text("Dediche") })
+                NavigationBarItem(tab == 3, { tab = 3 }, { Icon(Icons.Rounded.Chat, null) }, label = { Text("Ticket") })
+                NavigationBarItem(tab == 4, { tab = 4 }, { Icon(Icons.Rounded.Flag, null) }, label = { Text("Segnal.") })
             }
         }
     ) { pad ->
@@ -164,7 +169,12 @@ private fun Main(key: String, onLogout: () -> Unit) {
             when (tab) {
                 0 -> UsersTab(key, reload) { actionUser = it }
                 1 -> CommentsTab(key, reload) { actionUser = it }
-                else -> DedsTab(key, reload) { actionUser = it }
+                2 -> DedsTab(key, reload) { actionUser = it }
+                3 -> if (openTicket == null) TicketsTab(key, reload) { openTicket = it } else {
+                    androidx.activity.compose.BackHandler { openTicket = null; reload++ }
+                    TicketChat(key, openTicket!!, onUser = { actionUser = it }, onBack = { openTicket = null; reload++ })
+                }
+                else -> ReportsTab(key, reload) { actionUser = it }
             }
         }
     }
@@ -215,6 +225,8 @@ private fun UsersTab(key: String, reload: Int, onUser: (String) -> Unit) {
                         Text(u.name.ifBlank { "(senza nome)" } + "  ·  " + u.id.take(8), style = MaterialTheme.typography.titleMedium)
                         Text("Iscritto ${date(u.created)} · ${u.comments} commenti · ${u.deds} dediche", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            if (u.admin) AssistChip({}, { Text("admin") })
+                            if (u.mod > 0) AssistChip({}, { Text("moderatore dal ${date(u.mod)}") })
                             if (u.verified) AssistChip({}, { Text("verificato") })
                             if (u.banned) AssistChip({}, { Text("bannato") })
                             if (u.until > System.currentTimeMillis()) AssistChip({}, { Text("sospeso fino al ${date(u.until)}") })
@@ -323,10 +335,108 @@ private fun UserSheet(key: String, id: String, onDone: () -> Unit, onDismiss: ()
                 Button({ warn = true }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Invia reclamo") }
                 FilledTonalButton({ suspend = true }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Sospendi") }
                 OutlinedButton({ act(JSONObject().put("action", "unsuspend")) }, modifier = Modifier.fillMaxWidth()) { Text("Togli sospensione") }
+                FilledTonalButton({ act(JSONObject().put("action", "mod")) }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Rendi moderatore") }
+                OutlinedButton({ act(JSONObject().put("action", "unmod")) }, modifier = Modifier.fillMaxWidth()) { Text("Togli moderatore") }
                 FilledTonalButton({ act(JSONObject().put("action", "ban")) }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Banna") }
                 OutlinedButton({ act(JSONObject().put("action", "unban")) }, modifier = Modifier.fillMaxWidth()) { Text("Togli ban") }
             }
             msg?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+        }
+    }
+}
+
+@Composable
+private fun TicketsTab(key: String, reload: Int, onOpen: (TicketRow) -> Unit) {
+    Loader(reload, { AdminApi.tickets(key) }) { list ->
+        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(list, key = { it.id }) { t ->
+                CardRow({ onOpen(t) }) {
+                    Text(t.subject + if (t.unread) "  ●" else "", style = MaterialTheme.typography.titleMedium, color = if (t.unread) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                    Text(t.last, style = MaterialTheme.typography.bodyMedium, maxLines = 2)
+                    Text((if (t.open) "aperto" else "chiuso") + " · " + t.user.take(8) + " · " + date(t.updated), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+/** Chat di un ticket: l'utente scrive dall'app, tu rispondi da qui. */
+@Composable
+private fun TicketChat(key: String, t: TicketRow, onUser: (String) -> Unit, onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var msgs by remember { mutableStateOf<List<TicketMsg>>(emptyList()) }
+    var user by remember { mutableStateOf(t.user) }
+    var text by remember { mutableStateOf("") }
+    var bump by remember { mutableIntStateOf(0) }
+    var open by remember { mutableStateOf(t.open) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(bump) {
+        while (true) {
+            runCatching { AdminApi.ticket(key, t.id) }.onSuccess { user = it.first; msgs = it.second }
+            kotlinx.coroutines.delay(8000)
+        }
+    }
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onBack) { Text("Indietro") }
+            Text(t.subject, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            OutlinedButton({ onUser(user) }) { Text("Utente") }
+        }
+        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(msgs.size) { i ->
+                val m = msgs[i]
+                val mine = m.side == "admin"
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (mine) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.fillMaxWidth(0.84f)
+                    ) { Column(Modifier.padding(12.dp)) { Text(m.text); Text(date(m.ts), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+                }
+            }
+        }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        if (open) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(text, { text = it.take(1000) }, placeholder = { Text("Rispondi…") }, modifier = Modifier.weight(1f))
+                Button(enabled = text.isNotBlank(), onClick = {
+                    val send = text; text = ""
+                    scope.launch {
+                        try { AdminApi.call(key, "POST", "/v1/admin/tickets/${t.id}/msg", JSONObject().put("text", send)); bump++ }
+                        catch (e: Exception) { error = e.message; text = send }
+                    }
+                }) { Text("Invia") }
+            }
+            OutlinedButton({
+                scope.launch { runCatching { AdminApi.call(key, "POST", "/v1/admin/tickets/${t.id}/close", JSONObject()) }; open = false }
+            }, modifier = Modifier.fillMaxWidth()) { Text("Chiudi ticket") }
+        } else Text("Ticket chiuso", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Segnalazioni dei moderatori: leggi, e se serve rimuovi il commento o agisci sull'utente. */
+@Composable
+private fun ReportsTab(key: String, reload: Int, onUser: (String) -> Unit) {
+    val scope = rememberCoroutineScope()
+    var bump by remember { mutableIntStateOf(0) }
+    Loader(reload + bump, { AdminApi.reports(key) }) { list ->
+        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(list, key = { it.id }) { r ->
+                CardRow {
+                    Text("Da ${r.reporter.take(8)} su ${r.target.take(8)} · ${date(r.ts)}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (r.commentText.isNotBlank()) Text("“${r.commentText}”", style = MaterialTheme.typography.bodyMedium)
+                    if (r.text.isNotBlank()) Text("Motivo: ${r.text}", style = MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalButton({
+                            scope.launch { runCatching { AdminApi.call(key, "POST", "/v1/admin/report-resolve", JSONObject().put("id", r.id).put("removeComment", true)) }; bump++ }
+                        }) { Text("Rimuovi commento") }
+                        OutlinedButton({
+                            scope.launch { runCatching { AdminApi.call(key, "POST", "/v1/admin/report-resolve", JSONObject().put("id", r.id)) }; bump++ }
+                        }) { Text("Ignora") }
+                        OutlinedButton({ onUser(r.target) }) { Text("Utente") }
+                    }
+                }
+            }
         }
     }
 }

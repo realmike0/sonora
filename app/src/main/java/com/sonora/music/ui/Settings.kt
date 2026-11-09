@@ -15,6 +15,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.rounded.ManageAccounts
+import androidx.compose.material.icons.rounded.Mail
+import com.sonora.music.SonoraId
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Tune
@@ -74,7 +76,8 @@ import com.sonora.music.SyncState
 @OptIn(ExperimentalLayoutApi::class, androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier = Modifier) {
-    var page by remember { mutableStateOf<String?>(null) }
+    val start = remember { vm.settingsStart.also { vm.settingsStart = null } }
+    var page by remember { mutableStateOf<String?>(if (start != null) "inbox" else null) }
     androidx.activity.compose.BackHandler(enabled = page != null) { page = null }
     Surface(color = MaterialTheme.colorScheme.background, contentColor = MaterialTheme.colorScheme.onBackground, modifier = modifier.fillMaxSize()) {
         androidx.compose.animation.AnimatedContent(
@@ -92,7 +95,7 @@ fun SettingsScreen(vm: PlayerViewModel, onClose: () -> Unit, modifier: Modifier 
             label = "settings"
         ) { p ->
             if (p == null) SettingsHub(vm, onClose, open = { page = it })
-            else SettingsPage(vm, p, onBack = { page = null })
+            else SettingsPage(vm, p, onBack = { page = null }, startNew = start == "ticket-new")
         }
     }
 }
@@ -111,11 +114,21 @@ private fun SettingsHub(vm: PlayerViewModel, onClose: () -> Unit, open: (String)
         }
         SettingsHeader(store.userName.ifBlank { "Ospite" }, installed)
         Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+        androidx.compose.runtime.LaunchedEffect(SonoraId.signedIn) {
+            if (SonoraId.signedIn) runCatching { SonoraId.notices(context) }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)) {
             Button(onClick = { if (installed) com.sonora.music.Framework.manage(context) else open("manage") }) {
                 Icon(Icons.Rounded.ManageAccounts, null)
                 Spacer(Modifier.width(8.dp))
                 Text(tr("Gestisci"))
+            }
+            androidx.compose.material3.FilledTonalButton(onClick = { open("inbox") }) {
+                androidx.compose.material3.BadgedBox(badge = {
+                    if (SonoraId.unread > 0) androidx.compose.material3.Badge { Text(SonoraId.unread.toString()) }
+                }) { Icon(Icons.Rounded.Mail, null) }
+                Spacer(Modifier.width(8.dp))
+                Text(tr("Posta in arrivo"))
             }
         }
         Spacer(Modifier.height(20.dp))
@@ -242,7 +255,7 @@ private fun SettingsHeader(name: String, hasFramework: Boolean) {
 
 @OptIn(ExperimentalLayoutApi::class, androidx.media3.common.util.UnstableApi::class)
 @Composable
-private fun SettingsPage(vm: PlayerViewModel, page: String, onBack: () -> Unit) {
+private fun SettingsPage(vm: PlayerViewModel, page: String, onBack: () -> Unit, startNew: Boolean = false) {
     val store = vm.store
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
@@ -250,7 +263,7 @@ private fun SettingsPage(vm: PlayerViewModel, page: String, onBack: () -> Unit) 
         try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?" } catch (e: Exception) { "?" }
     }
     val title = when (page) {
-        "manage" -> tr("Gestisci"); "style" -> tr("Style"); "player" -> tr("Player")
+        "manage" -> tr("Gestisci"); "inbox" -> tr("Posta in arrivo"); "style" -> tr("Style"); "player" -> tr("Player")
         "advanced" -> tr("Advanced"); "languages" -> tr("Languages"); else -> tr("Info")
     }
     Column(
@@ -263,6 +276,7 @@ private fun SettingsPage(vm: PlayerViewModel, page: String, onBack: () -> Unit) 
             Text(title, style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold))
         }
         when (page) {
+            "inbox" -> InboxPage(startNew)
             "manage" -> SettingsCard(tr("Profilo")) {
                 GoogleSection(vm)
                 SonoraIdSection(vm)

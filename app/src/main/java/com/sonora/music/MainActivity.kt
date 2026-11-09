@@ -41,6 +41,7 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent?) {
         intent?.getStringExtra(EXTRA_ARTIST)?.takeIf { it.isNotBlank() }?.let { vm.artistOpen = it }
         if (intent?.getBooleanExtra(EXTRA_WRAPPED, false) == true) vm.wrappedOpen = true
+        if (intent?.getBooleanExtra(EXTRA_INBOX, false) == true) { vm.settingsStart = "inbox"; vm.settingsOpen = true; intent.removeExtra(EXTRA_INBOX) }
         intent?.getStringExtra(EXTRA_PLAY_ID)?.takeIf { it.isNotBlank() }?.let { id ->
             vm.play(
                 listOf(Track(id, intent.getStringExtra(EXTRA_PLAY_TITLE) ?: "", intent.getStringExtra(EXTRA_PLAY_ARTIST) ?: "",
@@ -53,6 +54,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_ARTIST = "open_artist"
         const val EXTRA_WRAPPED = "open_wrapped"
+        const val EXTRA_INBOX = "open_inbox"
         const val EXTRA_PLAY_ID = "play_id"
         const val EXTRA_PLAY_TITLE = "play_title"
         const val EXTRA_PLAY_ARTIST = "play_artist"

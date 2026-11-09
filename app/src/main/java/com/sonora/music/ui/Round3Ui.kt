@@ -138,20 +138,62 @@ fun FavoritesPage(vm: PlayerViewModel, bottomPad: androidx.compose.ui.unit.Dp, o
     }
 }
 
-/** Mostra gli avvisi mandati dall'amministrazione (per esempio un reclamo sul comportamento). */
+/**
+ * Avvisi dell'amministrazione: una tendina in alto appena apri Sonora (gialla = reclamo, grigia = sospensione,
+ * rossa = ban) con il pulsante per aprire un ticket, più la notifica colorata del telefono.
+ */
 @Composable
-fun NoticeDialog() {
+fun NoticeHost(vm: PlayerViewModel) {
     val context = LocalContext.current
-    var texts by remember { mutableStateOf<List<String>>(emptyList()) }
+    var banner by remember { mutableStateOf<SonoraId.Notice?>(null) }
     LaunchedEffect(SonoraId.signedIn) {
-        if (SonoraId.signedIn) texts = runCatching { SonoraId.notices(context) }.getOrDefault(emptyList())
+        if (!SonoraId.signedIn) return@LaunchedEffect
+        while (true) {
+            val list = runCatching { SonoraId.notices(context) }.getOrDefault(emptyList())
+            list.forEach { com.sonora.music.ModNotify.show(context, it) }
+            list.firstOrNull { it.kind == "warn" || it.kind == "suspend" || it.kind == "ban" }?.let { banner = it }
+                ?: list.firstOrNull()?.let { banner = it }
+            delay(60_000)
+        }
     }
-    if (texts.isNotEmpty()) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { texts = emptyList() },
-            title = { Text(tr("Avviso da Sonora")) },
-            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { texts.forEach { Text(it) } } },
-            confirmButton = { androidx.compose.material3.TextButton(onClick = { texts = emptyList() }) { Text("OK") } }
-        )
+    Box(Modifier.fillMaxWidth().statusBarsPadding().padding(10.dp)) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = banner != null,
+            enter = androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(350)) { -it } + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(250)) { -it } + androidx.compose.animation.fadeOut()
+        ) {
+            val n = banner ?: return@AnimatedVisibility
+            val bg = when (n.kind) {
+                "warn" -> androidx.compose.ui.graphics.Color(0xFFFFE082)
+                "suspend" -> androidx.compose.ui.graphics.Color(0xFF616161)
+                "ban" -> androidx.compose.ui.graphics.Color(0xFFC62828)
+                else -> MaterialTheme.colorScheme.primaryContainer
+            }
+            val fg = when (n.kind) {
+                "warn" -> androidx.compose.ui.graphics.Color.Black
+                "suspend", "ban" -> androidx.compose.ui.graphics.Color.White
+                else -> MaterialTheme.colorScheme.onPrimaryContainer
+            }
+            Surface(color = bg, contentColor = fg, shape = RoundedCornerShape(24.dp), shadowElevation = 6.dp, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(tr(com.sonora.music.ModNotify.title(n.kind)), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                    Text(n.text, style = MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        androidx.compose.material3.TextButton(
+                            onClick = {
+                                vm.settingsStart = if (n.kind == "ticket" || n.kind == "info") "inbox" else "ticket-new"
+                                vm.settingsOpen = true
+                                banner = null
+                            },
+                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = fg)
+                        ) { Text(tr(if (n.kind == "ticket" || n.kind == "info") "Apri posta" else "Apri ticket"), fontWeight = FontWeight.Bold) }
+                        androidx.compose.material3.TextButton(
+                            onClick = { banner = null },
+                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = fg)
+                        ) { Text(tr("Chiudi")) }
+                    }
+                }
+            }
+        }
     }
 }

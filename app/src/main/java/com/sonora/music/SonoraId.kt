@@ -224,15 +224,17 @@ object SonoraId {
 
     // ───────── Commenti Sonora e album in attesa ─────────
 
-    data class SonoraComment(val id: String, val name: String, val text: String, val ts: Long, val mine: Boolean)
+    data class SonoraComment(val id: String, val name: String, val text: String, val ts: Long, val mine: Boolean, val role: String = "user", val since: Long = 0L)
     data class Upcoming(val id: String, val artist: String, val album: String, val cover: String?, val release: Long)
 
     suspend fun comments(c: Context, trackId: String): List<SonoraComment> {
         val r = call(c, "GET", "/v1/comments?track=$trackId", null, auth = signedIn)
+        role = r.optString("me", "user").ifEmpty { "user" }
         val a = r.optJSONArray("items") ?: JSONArray()
         return (0 until a.length()).map { i ->
             val o = a.getJSONObject(i)
-            SonoraComment(o.optString("id"), o.optString("name"), o.optString("text"), o.optLong("ts"), o.optBoolean("mine"))
+            SonoraComment(o.optString("id"), o.optString("name"), o.optString("text"), o.optLong("ts"), o.optBoolean("mine"),
+                o.optString("role", "user"), o.optLong("since"))
         }
     }
 
@@ -252,10 +254,58 @@ object SonoraId {
         }
     }
 
-    /** Avvisi (reclami) mandati dagli amministratori: si leggono una volta sola. */
-    suspend fun notices(c: Context): List<String> {
+    // ───────── Ruolo, posta in arrivo, ticket, moderazione ─────────
+
+    /** "admin", "mod" oppure "user". */
+    var role by mutableStateOf("user")
+    var modSince by mutableStateOf(0L)
+    var unread by mutableStateOf(0)
+    val isMod: Boolean get() = role == "mod" || role == "admin"
+
+    data class Notice(val id: String, val kind: String, val text: String, val ts: Long)
+    data class InboxItem(val id: String, val kind: String, val text: String, val ts: Long, val read: Boolean)
+    data class TicketRow(val id: String, val subject: String, val status: String, val updated: Long)
+    data class TicketMsg(val side: String, val text: String, val ts: Long)
+    data class TicketFull(val id: String, val subject: String, val status: String, val messages: List<TicketMsg>)
+
+    /** Avvisi nuovi (reclami, sospensioni, ban, risposte ai ticket): arrivano una volta sola. Aggiorna anche ruolo e posta non letta. */
+    suspend fun notices(c: Context): List<Notice> {
         val r = call(c, "GET", "/v1/id/notices", null, auth = true)
+        role = r.optString("role", "user").ifEmpty { "user" }
+        modSince = r.optLong("since")
+        unread = r.optInt("unread")
         val a = r.optJSONArray("items") ?: JSONArray()
-        return (0 until a.length()).map { a.getJSONObject(it).optString("text") }
+        return (0 until a.length()).map { val o = a.getJSONObject(it); Notice(o.optString("id"), o.optString("kind"), o.optString("text"), o.optLong("ts")) }
+    }
+
+    suspend fun inbox(c: Context): List<InboxItem> {
+        val a = call(c, "GET", "/v1/id/inbox", null, auth = true).optJSONArray("items") ?: JSONArray()
+        return (0 until a.length()).map { val o = a.getJSONObject(it); InboxItem(o.optString("id"), o.optString("kind"), o.optString("text"), o.optLong("ts"), o.optBoolean("read")) }
+    }
+
+    suspend fun inboxRead(c: Context) { call(c, "POST", "/v1/id/inbox/read", JSONObject(), auth = true); unread = 0 }
+
+    suspend fun tickets(c: Context): List<TicketRow> {
+        val a = call(c, "GET", "/v1/id/tickets", null, auth = true).optJSONArray("items") ?: JSONArray()
+        return (0 until a.length()).map { val o = a.getJSONObject(it); TicketRow(o.optString("id"), o.optString("subject"), o.optString("status"), o.optLong("updated")) }
+    }
+
+    suspend fun ticket(c: Context, id: String): TicketFull {
+        val r = call(c, "GET", "/v1/id/tickets/$id", null, auth = true)
+        val a = r.optJSONArray("messages") ?: JSONArray()
+        return TicketFull(r.optString("id"), r.optString("subject"), r.optString("status"),
+            (0 until a.length()).map { val o = a.getJSONObject(it); TicketMsg(o.optString("side"), o.optString("text"), o.optLong("ts")) })
+    }
+
+    suspend fun newTicket(c: Context, subject: String, text: String): String =
+        call(c, "POST", "/v1/id/tickets", JSONObject().put("subject", subject).put("text", text), auth = true).optString("id")
+
+    suspend fun ticketMsg(c: Context, id: String, text: String) {
+        call(c, "POST", "/v1/id/tickets/$id/msg", JSONObject().put("text", text), auth = true)
+    }
+
+    /** Strumenti dei moderatori: remove / suspend / warn / report su un commento. */
+    suspend fun modAct(c: Context, comment: String, action: String, days: Int = 0, text: String = "") {
+        call(c, "POST", "/v1/id/mod/act", JSONObject().put("comment", comment).put("action", action).put("days", days).put("text", text), auth = true)
     }
 }
