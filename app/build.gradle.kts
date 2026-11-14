@@ -14,24 +14,9 @@ android {
         applicationId = "com.sonora.music"
         minSdk = 26
         targetSdk = 36
-        versionCode = 97
+        versionCode = 98
         versionName = "0.90-beta"
     }
-
-    compileOptions {
-        isCoreLibraryDesugaringEnabled = true
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = "11"
-    }
-}
-
-dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
-}
 
     // Chiave di firma FISSA (nel repo): ogni build ha la stessa firma, quindi gli aggiornamenti
     // si installano sopra la versione precedente senza "firma non corrispondente".
@@ -88,7 +73,7 @@ kotlin {
 }
 
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
 
     // Compose + Material 3 (Expressive)
     implementation(platform("androidx.compose:compose-bom:2025.09.00"))
