@@ -26,6 +26,17 @@ jobs:
           echo "v=$V" >> "$GITHUB_OUTPUT"
           cp app/build/outputs/apk/release/app-release.apk "Sonora-v$V.apk"
           cp framework/build/outputs/apk/release/framework-release.apk SonoraFramework.apk
+          cp admin/build/outputs/apk/release/admin-release.apk SonoraAdmin.apk
+
+      # Tutti e 3 gli APK restano scaricabili da Actions (solo per te, 14 giorni).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sonora-apk
+          retention-days: 14
+          path: |
+            Sonora-v${{ steps.ver.outputs.v }}.apk
+            SonoraFramework.apk
+            SonoraAdmin.apk
 
       # Pubblica (o aggiorna) la release: l'app la controlla da sola per gli aggiornamenti.
       - uses: softprops/action-gh-release@v2

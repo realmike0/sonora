@@ -15,7 +15,7 @@
 ## Part 4
 
 **New**
-- Sonora Admin: a small separate app to manage users, comments and dedications (private build)
+- Sonora Admin: a small separate app to manage users, comments and dedications
 - Users can be banned, suspended for N days, or sent a complaint (shown inside Sonora and sent by email if verified)
 - Suspended accounts can't comment or dedicate
 
