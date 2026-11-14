@@ -33,6 +33,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Sonora">
 
+        <activity android:name=".CrashActivity" android:exported="false" android:process=":crash" android:excludeFromRecents="true" android:theme="@android:style/Theme.Material.Light.NoActionBar" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

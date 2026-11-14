@@ -22,6 +22,22 @@ class SonoraApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        // Il processo della schermata d'errore non deve inizializzare nient'altro.
+        if (android.os.Build.VERSION.SDK_INT >= 28 && getProcessName().endsWith(":crash")) return
+        // Se l'app crasha, mostra l'errore in una schermata a parte (così si può copiare e mandare).
+        val old = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            try {
+                val trace = android.util.Log.getStackTraceString(e).take(6000)
+                startActivity(
+                    android.content.Intent(this, CrashActivity::class.java).putExtra("trace", trace)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                )
+                Thread.sleep(400)
+            } catch (_: Throwable) {
+            }
+            old?.uncaughtException(t, e)
+        }
         AudioStore.init(this)
         AudioPrefs.load(this)
         PlayLog.init(this)
