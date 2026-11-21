@@ -52,18 +52,29 @@ object Ai {
     }
 
     /** Voto e giudizio di un album o di un artista. Il risultato si ricorda sul telefono. */
+    private val memory = HashMap<String, Rating>()
+
     suspend fun rate(c: Context, kind: String, name: String, artist: String, tracks: List<String>): Rating {
         val lang = com.sonora.music.ui.Lang.effective()
-        val key = "ai_rate2_${kind}_${lang}_${name.lowercase()}_${artist.lowercase()}".take(120)
+        val key = "ai_rate3_${kind}_${lang}_${name.lowercase()}_${artist.lowercase()}".take(120)
+        synchronized(memory) { memory[key] }?.let { return it }
         prefs(c).getString(key, null)?.let { s ->
-            runCatching { JSONObject(s) }.getOrNull()?.let { return parse(it) }
+            runCatching { JSONObject(s) }.getOrNull()?.let { j ->
+                val p = parse(j)
+                // Un voto salvato senza i dettagli (vecchia versione) si rifà: serve per il grafico e i voti dei brani.
+                val complete = p.meaning > 0 && (kind != "album" || tracks.isEmpty() || p.tracks.any { it > 0 })
+                if (complete) { synchronized(memory) { memory[key] = p }; return p }
+            }
         }
         val r = call(
             c, "/v1/ai/rate",
             JSONObject().put("kind", kind).put("name", name).put("artist", artist).put("tracks", JSONArray(tracks.take(25)))
         )
         val rating = parse(r)
-        if (rating.score > 0) prefs(c).edit().putString(key, r.toString()).apply()
+        if (rating.score > 0) {
+            prefs(c).edit().putString(key, r.toString()).apply()
+            synchronized(memory) { memory[key] = rating }
+        }
         return rating
     }
 

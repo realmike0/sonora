@@ -1,9 +1,9 @@
 name: Sonora Pages (player web + repository F-Droid)
-# Un solo sito su GitHub Pages: / = player web, /fdroid/repo = repository F-Droid.
+# Un solo sito su GitHub Pages: / = pagina di download, /web/ = player web, /fdroid/repo = repository F-Droid.
 on:
   push:
     branches: [main]
-    paths: ["web/**", "fdroid/**"]
+    paths: ["web/**", "fdroid/**", "site/**"]
   workflow_run:
     workflows: ["Build APK"]
     types: [completed]
@@ -28,8 +28,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Sito
         run: |
-          mkdir -p _site
-          cp -r web/. _site/
+          mkdir -p _site/web
+          cp -r site/. _site/
+          cp -r web/. _site/web/
+          # senza F-Droid il link con l'impronta non esiste: si toglie
+          sed -i 's/?fingerprint=__FP__//g' _site/index.html
       - name: Repository F-Droid
         if: ${{ vars.DEPLOY_FDROID == 'true' || github.event_name == 'workflow_dispatch' }}
         env:
@@ -52,6 +55,8 @@ jobs:
           cp -r fdroid/repo _site/fdroid/repo
           FP=$(sed -n 's/^Impronta del repository: //p' fp.txt)
           sed "s/__FP__/${FP}/g" fdroid/site/index.html > _site/fdroid/index.html
+          cp site/index.html _site/index.html
+          sed -i "s/__FP__/${FP}/g" _site/index.html
           {
             echo "### Repository F-Droid"
             echo "Link da aggiungere in F-Droid: \`${REPO_URL}?fingerprint=${FP}\`"

@@ -280,6 +280,37 @@ async function sonoraId(req, env, path) {
     const rows = await env.DB.prepare("SELECT track_id,title,artist,thumb,dur FROM sid_likes WHERE user_id=? ORDER BY ts DESC LIMIT 5000").bind(uid).all();
     return J({ likes: rows.results.map((r) => ({ id: r.track_id, title: r.title, artist: r.artist, thumb: r.thumb, dur: r.dur })) });
   }
+  if (req.method === "POST" && path === "/v1/id/sync-playlists") {
+    const b = await req.json();
+    const P = Array.isArray(b.playlists) ? b.playlists.slice(0, 60) : [];
+    const R = Array.isArray(b.removed) ? b.removed.slice(0, 200) : [];
+    const rows = await env.DB.prepare("SELECT pl_id,name,tracks,updated,deleted FROM sid_pl WHERE user_id=?").bind(uid).all();
+    const cur = new Map(rows.results.map((r) => [r.pl_id, r]));
+    const now = Date.now();
+    const up = env.DB.prepare("INSERT INTO sid_pl(user_id,pl_id,name,tracks,updated,deleted) VALUES(?,?,?,?,?,0) ON CONFLICT(user_id,pl_id) DO UPDATE SET name=excluded.name,tracks=excluded.tracks,updated=excluded.updated,deleted=0");
+    const tomb = env.DB.prepare("INSERT INTO sid_pl(user_id,pl_id,name,tracks,updated,deleted) VALUES(?,?,'','[]',?,1) ON CONFLICT(user_id,pl_id) DO UPDATE SET name='',tracks='[]',updated=excluded.updated,deleted=1");
+    const batch = [];
+    for (const pl of P) {
+      if (!pl || typeof pl.id !== "string" || !Array.isArray(pl.tracks)) continue;
+      const id = pl.id.slice(0, 60), upd = Math.min(now, Math.max(0, +pl.updated || 0));
+      const old = cur.get(id);
+      if (old && old.updated >= upd) continue; // sul server c'è una versione più recente (o una cancellazione)
+      const tracks = pl.tracks.slice(0, 500).filter((t) => t && typeof t.id === "string").map((t) => ({
+        id: t.id.slice(0, 40), title: String(t.title || "").slice(0, 200), artist: String(t.artist || "").slice(0, 200), thumb: String(t.thumb || "").slice(0, 400), dur: Math.max(0, +t.dur || 0),
+      }));
+      const name = String(pl.name || "Playlist").slice(0, 80);
+      batch.push(up.bind(uid, id, name, JSON.stringify(tracks), upd));
+      cur.set(id, { pl_id: id, name, tracks: JSON.stringify(tracks), updated: upd, deleted: 0 });
+    }
+    for (const x of R) {
+      if (typeof x !== "string") continue;
+      const id = x.slice(0, 60);
+      batch.push(tomb.bind(uid, id, now));
+      cur.set(id, { pl_id: id, name: "", tracks: "[]", updated: now, deleted: 1 });
+    }
+    if (batch.length) await env.DB.batch(batch);
+    return J({ playlists: [...cur.values()].map((r) => ({ id: r.pl_id, name: r.name, updated: r.updated, deleted: !!r.deleted, tracks: r.deleted ? [] : JSON.parse(r.tracks || "[]") })) });
+  }
   if (req.method === "GET" && path === "/v1/id/devices") {
     const m = (req.headers.get("authorization") || "").match(/^Bearer (.+)$/);
     const cur = await sha(m[1]);

@@ -41,17 +41,28 @@ fun AiRatingCard(kind: String, name: String, artist: String, tracks: List<String
     val context = LocalContext.current
     var rating by remember(kind, name, artist) { mutableStateOf<Ai.Rating?>(null) }
     var failed by remember(kind, name, artist) { mutableStateOf(false) }
-    LaunchedEffect(kind, name, artist, Lang.code) {
+    var retry by remember(kind, name, artist) { mutableStateOf(0) }
+    LaunchedEffect(kind, name, artist, Lang.code, retry) {
         failed = false
-        rating = try {
-            Ai.rate(context, kind, name, artist, tracks)
+        try {
+            // Il voto già arrivato non si cancella mai: se una nuova richiesta fallisce, resta quello che si vede.
+            rating = Ai.rate(context, kind, name, artist, tracks)
         } catch (e: Exception) {
-            failed = true
-            null
+            if (rating == null) failed = true
         }
     }
-    if (failed) return
     val r = rating
+    if (failed && r == null) {
+        Surface(
+            shape = RoundedCornerShape(AppStyle.card),
+            color = accent.copy(alpha = 0.16f),
+            onClick = { retry++ },
+            modifier = modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp)
+        ) {
+            Text(tr("Voto dell'AI non disponibile. Tocca per riprovare."), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(16.dp))
+        }
+        return
+    }
     Surface(
         shape = RoundedCornerShape(AppStyle.card),
         color = accent.copy(alpha = 0.16f),

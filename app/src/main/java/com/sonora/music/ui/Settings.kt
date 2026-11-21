@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.rounded.ManageAccounts
 import androidx.compose.material.icons.rounded.Mail
 import com.sonora.music.SonoraId
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Tune
@@ -321,6 +322,7 @@ private fun SettingsPage(vm: PlayerViewModel, page: String, onBack: () -> Unit, 
             "languages" -> SettingsCard(tr("Lingua")) { LanguageSection() }
             else -> {
                 SettingsCard(tr("Informazioni")) { Text("Sonora $version", style = MaterialTheme.typography.titleMedium) }
+                SettingsCard(tr("Sincronizzazione")) { SyncSection(vm) }
                 SettingsCard(tr("Aggiornamenti")) { UpdateSection(vm, version) }
                 SettingsCard(tr("Community")) {
                     Text(tr("Novità, aggiornamenti e supporto sul canale Telegram di Sonora."), style = MaterialTheme.typography.bodyMedium)
@@ -709,4 +711,20 @@ private fun formatBytes(bytes: Long): String = when {
     bytes >= 1024L * 1024 * 1024 -> String.format(java.util.Locale.getDefault(), "%.1f GB", bytes / (1024.0 * 1024 * 1024))
     bytes >= 1024L * 1024 -> String.format(java.util.Locale.getDefault(), "%d MB", bytes / (1024 * 1024))
     else -> String.format(java.util.Locale.getDefault(), "%d KB", bytes / 1024)
+}
+
+/** Sincronizza preferiti e playlist con il tuo Sonora ID, per averli uguali su tutti i telefoni. */
+@Composable
+private fun SyncSection(vm: PlayerViewModel) {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    if (!SonoraId.signedIn) {
+        Text(tr("Accedi con Sonora ID (Gestisci) per sincronizzare preferiti e playlist tra i tuoi telefoni."), style = MaterialTheme.typography.bodyMedium)
+        return
+    }
+    Text(tr("Preferiti e playlist create nell'app, uguali su tutti i telefoni con il tuo Sonora ID."), style = MaterialTheme.typography.bodyMedium)
+    Button(enabled = !SonoraId.syncing, onClick = { scope.launch { SonoraId.sync(context, vm.store) } }) {
+        Text(tr(if (SonoraId.syncing) "Sincronizzo…" else "Sincronizza ora"))
+    }
+    SonoraId.message?.let { Text(tr(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
 }

@@ -21,7 +21,8 @@ data class Playlist(
     val id: String,
     val name: String,
     val tracks: List<Track>,
-    val fromGoogle: Boolean = false
+    val fromGoogle: Boolean = false,
+    val updated: Long = 0L
 )
 
 fun Track.toJson(): JSONObject = JSONObject().apply {
@@ -92,6 +93,9 @@ class Store(context: Context) {
     /** Brani avviati dai risultati di ricerca. */
     val searchPlays = mutableStateListOf<Track>()
     val playlists = mutableStateListOf<Playlist>()
+
+    /** Playlist cancellate qui che il server deve ancora sapere (poi si svuota). Va dichiarata prima di init, che carica i dati. */
+    val removedPlaylists = mutableSetOf<String>()
 
     init {
         load()
@@ -187,7 +191,7 @@ class Store(context: Context) {
     // ───────── Playlist ─────────
 
     fun createPlaylist(name: String): Playlist {
-        val p = Playlist(UUID.randomUUID().toString(), name.trim().ifEmpty { "Nuova playlist" }, emptyList())
+        val p = Playlist(UUID.randomUUID().toString(), name.trim().ifEmpty { "Nuova playlist" }, emptyList(), updated = System.currentTimeMillis())
         playlists.add(p)
         save()
         return p
@@ -198,7 +202,7 @@ class Store(context: Context) {
         if (i < 0) return
         val p = playlists[i]
         if (p.tracks.any { it.id == track.id }) return
-        playlists[i] = p.copy(tracks = p.tracks + track)
+        playlists[i] = p.copy(tracks = p.tracks + track, updated = System.currentTimeMillis())
         save()
     }
 
@@ -206,12 +210,29 @@ class Store(context: Context) {
         val i = playlists.indexOfFirst { it.id == playlistId }
         if (i < 0) return
         val p = playlists[i]
-        playlists[i] = p.copy(tracks = p.tracks.filter { it.id != trackId })
+        playlists[i] = p.copy(tracks = p.tracks.filter { it.id != trackId }, updated = System.currentTimeMillis())
         save()
     }
 
     fun deletePlaylist(playlistId: String) {
+        val mine = playlists.firstOrNull { it.id == playlistId }
         playlists.removeAll { it.id == playlistId }
+        if (mine != null && !mine.fromGoogle) removedPlaylists.add(playlistId)
+        save()
+    }
+
+    /** Unisce le playlist arrivate dal server: vince la versione modificata per ultima. */
+    fun applySyncedPlaylists(remote: List<Playlist>, deleted: Set<String>) {
+        for (id in deleted) {
+            val i = playlists.indexOfFirst { it.id == id && !it.fromGoogle }
+            if (i >= 0) playlists.removeAt(i)
+        }
+        for (r in remote) {
+            val i = playlists.indexOfFirst { it.id == r.id }
+            if (i < 0) playlists.add(r)
+            else if (!playlists[i].fromGoogle && r.updated > playlists[i].updated) playlists[i] = r
+        }
+        removedPlaylists.clear()
         save()
     }
 
@@ -232,6 +253,7 @@ class Store(context: Context) {
             root.optJSONArray("favArtists")?.let { a -> for (k in 0 until a.length()) favArtists.add(a.optString(k)) }
             root.optJSONArray("played")?.toTracks()?.let { played.addAll(it) }
             root.optJSONArray("searchPlays")?.toTracks()?.let { searchPlays.addAll(it) }
+            root.optJSONArray("plRemoved")?.let { a -> for (k in 0 until a.length()) removedPlaylists.add(a.optString(k)) }
             val arr = root.optJSONArray("playlists") ?: return
             for (i in 0 until arr.length()) {
                 val o = arr.optJSONObject(i) ?: continue
@@ -240,7 +262,8 @@ class Store(context: Context) {
                         id = o.getString("id"),
                         name = o.optString("name", "Playlist"),
                         tracks = o.optJSONArray("tracks")?.toTracks() ?: emptyList(),
-                        fromGoogle = o.optBoolean("google", false)
+                        fromGoogle = o.optBoolean("google", false),
+                        updated = o.optLong("updated", 0L)
                     )
                 )
             }
@@ -253,6 +276,7 @@ class Store(context: Context) {
         val likedSnap = liked.toList()
         val favSnap = favArtists.toList()
         val playlistsSnap = playlists.toList()
+        val removedSnap = removedPlaylists.toList()
         val playedSnap = played.toList()
         val searchSnap = searchPlays.toList()
         io.execute {
@@ -260,6 +284,7 @@ class Store(context: Context) {
                 val root = JSONObject()
                 root.put("liked", JSONArray(likedSnap.map { it.toJson() }))
                 root.put("favArtists", JSONArray(favSnap))
+                root.put("plRemoved", JSONArray(removedSnap))
                 root.put("played", JSONArray(playedSnap.map { it.toJson() }))
                 root.put("searchPlays", JSONArray(searchSnap.map { it.toJson() }))
                 root.put(
@@ -269,6 +294,7 @@ class Store(context: Context) {
                             put("id", p.id)
                             put("name", p.name)
                             put("google", p.fromGoogle)
+                            put("updated", p.updated)
                             put("tracks", JSONArray(p.tracks.map { it.toJson() }))
                         }
                     })

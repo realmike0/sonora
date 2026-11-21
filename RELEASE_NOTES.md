@@ -7,6 +7,9 @@
 - Moderators: tagged by the admin, they can remove comments, suspend (up to 7 days), send complaints and report to the admin
 - A small shield next to moderators shows how long they have been moderators (see docs/MODERATORS.md)
 - Reports weigh more when they come from moderators, and the admin's report hides a comment right away
+- Fix: the AI rating card (overall pie chart, per-song scores) no longer disappears after showing: it keeps the last rating, caches it in memory, and offers a retry if the request fails
+- "Sync now" button in Settings → Info: favorites and playlists created in the app are the same on all your phones
+- New download page (realmike0.github.io/sonora) with features, F-Droid/Obtainium links; the web player moves to /sonora/web/
 - Fix: crash when playing a song on Android 12 and older (Android 10 included)
 - If Sonora crashes it now shows the error (with a Copy button) so it can be sent to me
 - Ticket chat redesigned: pill text box that grows and sits above the keyboard, auto-scroll, instant send

@@ -34,3 +34,4 @@ CREATE TABLE IF NOT EXISTS sid_tmsg (id TEXT PRIMARY KEY, ticket_id TEXT NOT NUL
 CREATE INDEX IF NOT EXISTS idx_tmsg_ticket ON sid_tmsg(ticket_id, ts);
 CREATE TABLE IF NOT EXISTS sid_modreport (id TEXT PRIMARY KEY, reporter TEXT NOT NULL, target TEXT NOT NULL, comment_id TEXT, comment_text TEXT, text TEXT, ts INTEGER NOT NULL, status INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS sid_comm_rep2 (comment_id TEXT NOT NULL, user_id TEXT NOT NULL, w INTEGER NOT NULL, PRIMARY KEY(comment_id, user_id));
+CREATE TABLE IF NOT EXISTS sid_pl (user_id TEXT NOT NULL, pl_id TEXT NOT NULL, name TEXT, tracks TEXT, updated INTEGER NOT NULL, deleted INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_id, pl_id));

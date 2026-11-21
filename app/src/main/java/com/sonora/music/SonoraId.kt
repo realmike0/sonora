@@ -183,12 +183,44 @@ object SonoraId {
             }
             store.setLikedFromSync(remote)
             p.edit().remove("sid_removed").apply()
+            syncPlaylists(c, store)
             message = "Sincronizzato"
         } catch (e: IOException) {
             message = e.message ?: "Sincronizzazione non riuscita"
         } finally {
             syncing = false
         }
+    }
+
+    /** Sincronizza le playlist create nell'app (quelle importate da Google restano dove sono). */
+    private suspend fun syncPlaylists(c: Context, store: Store) {
+        val mine = store.playlists.toList().filter { !it.fromGoogle }
+        val body = JSONObject()
+            .put("playlists", JSONArray(mine.map { pl ->
+                JSONObject().put("id", pl.id).put("name", pl.name).put("updated", pl.updated)
+                    .put("tracks", JSONArray(pl.tracks.take(500).map { t ->
+                        JSONObject().put("id", t.id).put("title", t.title).put("artist", t.artist).put("thumb", t.thumb ?: "").put("dur", t.durationSec)
+                    }))
+            }))
+            .put("removed", JSONArray(store.removedPlaylists.toList()))
+        val r = call(c, "POST", "/v1/id/sync-playlists", body, auth = true)
+        val arr = r.optJSONArray("playlists") ?: JSONArray()
+        val remote = ArrayList<Playlist>()
+        val deleted = HashSet<String>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            if (o.optBoolean("deleted")) { deleted.add(o.getString("id")); continue }
+            val ta = o.optJSONArray("tracks") ?: JSONArray()
+            remote.add(Playlist(
+                o.getString("id"), o.optString("name", "Playlist"),
+                (0 until ta.length()).map { k ->
+                    val t = ta.getJSONObject(k)
+                    Track(t.getString("id"), t.optString("title"), t.optString("artist"), t.optString("thumb").ifEmpty { null }, t.optLong("dur"))
+                },
+                false, o.optLong("updated")
+            ))
+        }
+        store.applySyncedPlaylists(remote, deleted)
     }
 
     // ---- Dediche ----
