@@ -29,10 +29,15 @@ jobs:
       - name: Sito
         run: |
           mkdir -p _site/web
-          cp -r site/. _site/
           cp -r web/. _site/web/
-          # senza F-Droid il link con l'impronta non esiste: si toglie
-          sed -i 's/?fingerprint=__FP__//g' _site/index.html
+          if [ -f site/index.html ]; then
+            cp -r site/. _site/
+            # senza F-Droid il link con l'impronta non esiste: si toglie
+            sed -i 's/?fingerprint=__FP__//g' _site/index.html
+          else
+            echo "site/ manca: uso il player web come home"
+            cp -r web/. _site/
+          fi
       - name: Repository F-Droid
         if: ${{ vars.DEPLOY_FDROID == 'true' || github.event_name == 'workflow_dispatch' }}
         env:
@@ -55,8 +60,10 @@ jobs:
           cp -r fdroid/repo _site/fdroid/repo
           FP=$(sed -n 's/^Impronta del repository: //p' fp.txt)
           sed "s/__FP__/${FP}/g" fdroid/site/index.html > _site/fdroid/index.html
-          cp site/index.html _site/index.html
-          sed -i "s/__FP__/${FP}/g" _site/index.html
+          if [ -f site/index.html ]; then
+            cp site/index.html _site/index.html
+            sed -i "s/__FP__/${FP}/g" _site/index.html
+          fi
           {
             echo "### Repository F-Droid"
             echo "Link da aggiungere in F-Droid: \`${REPO_URL}?fingerprint=${FP}\`"

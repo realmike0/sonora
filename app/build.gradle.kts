@@ -14,7 +14,7 @@ android {
         applicationId = "com.sonora.music"
         minSdk = 26
         targetSdk = 36
-        versionCode = 101
+        versionCode = 102
         versionName = "0.90-beta"
     }
 
