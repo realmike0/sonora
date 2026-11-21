@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sonora: your music, in your phone's colors</title>
+<meta name="description" content="Sonora is a YouTube Music style player for Android with synced lyrics, background playback, downloads and Material You colors. Free, made from a phone.">
+<meta name="theme-color" content="#1b1233">
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --h:262;
+  color-scheme:light dark;
+  --bg:hsl(var(--h) 38% 97%);
+  --bg2:hsl(var(--h) 40% 93%);
+  --ink:hsl(var(--h) 30% 12%);
+  --mute:hsl(var(--h) 14% 38%);
+  --pri:hsl(var(--h) 60% 40%);
+  --onpri:#fff;
+  --cont:hsl(var(--h) 80% 90%);
+  --line:hsl(var(--h) 25% 82%);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:hsl(var(--h) 30% 8%);
+    --bg2:hsl(var(--h) 28% 13%);
+    --ink:hsl(var(--h) 25% 93%);
+    --mute:hsl(var(--h) 14% 70%);
+    --pri:hsl(var(--h) 85% 76%);
+    --onpri:hsl(var(--h) 60% 14%);
+    --cont:hsl(var(--h) 45% 24%);
+    --line:hsl(var(--h) 22% 24%);
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.6 Figtree,system-ui,sans-serif;transition:background .6s,color .6s;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:"Bricolage Grotesque",Figtree,system-ui,sans-serif;line-height:1.02;margin:0;letter-spacing:-.02em}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--pri);outline-offset:3px;border-radius:8px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+
+/* barra */
+header{display:flex;align-items:center;gap:20px;padding:18px 0;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font:800 22px "Bricolage Grotesque",sans-serif;text-decoration:none}
+.brand img{width:38px;height:38px;border-radius:11px}
+nav{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+nav a{padding:8px 14px;border-radius:999px;text-decoration:none;color:var(--mute);font-weight:500}
+nav a:hover{background:var(--bg2);color:var(--ink)}
+
+/* hero */
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center;padding:36px 0 56px}
+.hero h1{font-size:clamp(46px,8vw,92px);font-weight:800}
+.hero p.lead{font-size:20px;color:var(--mute);max-width:30ch;margin:22px 0 28px}
+.cta{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:16px 26px;border-radius:999px;background:var(--pri);color:var(--onpri);font-weight:700;text-decoration:none;transition:transform .15s,background .6s}
+.btn:hover{transform:translateY(-2px)}
+.btn.alt{background:var(--cont);color:var(--ink)}
+.badges{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.badges img{height:56px;display:block}
+.meta{margin-top:16px;color:var(--mute);font-size:15px}
+
+/* la scena dei testi sincronizzati */
+.stage{background:var(--cont);border-radius:36px;padding:26px;position:relative;overflow:hidden;transition:background .6s}
+.cover{width:132px;height:132px;position:relative}
+.cover svg{width:100%;height:100%;display:block;animation:settle 3s cubic-bezier(.1,.7,.2,1) 1 both}
+@keyframes settle{from{transform:rotate(0)}to{transform:rotate(1080deg)}}
+.now{display:flex;gap:18px;align-items:center}
+.now b{display:block;font:700 22px "Bricolage Grotesque",sans-serif}
+.now span{color:var(--mute);font-size:15px}
+.lyrics{margin:26px 0 8px;height:236px;overflow:hidden;position:relative;mask-image:linear-gradient(transparent,#000 22%,#000 78%,transparent);-webkit-mask-image:linear-gradient(transparent,#000 22%,#000 78%,transparent)}
+.lyrics ol{list-style:none;margin:0;padding:0;transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.lyrics li{font:700 28px/1.2 "Bricolage Grotesque",sans-serif;padding:8px 0;color:var(--mute);opacity:.45;transition:opacity .4s,color .4s}
+.lyrics li.on{opacity:1;color:var(--ink)}
+.bar{height:6px;border-radius:9px;background:color-mix(in srgb,var(--ink) 14%,transparent);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--pri);border-radius:9px;transition:width .6s linear,background .6s}
+.picker{display:flex;gap:10px;margin-top:18px;align-items:center;color:var(--mute);font-size:14px}
+.picker button{width:34px;height:34px;border-radius:50%;border:3px solid transparent;cursor:pointer;padding:0;background:hsl(var(--c) 75% 58%)}
+.picker button[aria-pressed=true]{border-color:var(--ink)}
+
+/* funzioni */
+section{padding:56px 0}
+.feat{display:grid;grid-template-columns:260px 1fr;gap:20px 48px;padding:34px 0}
+.feat+.feat{border-top:1px solid var(--line)}
+.feat h2{font-size:38px;position:sticky;top:20px;align-self:start}
+.feat ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:22px 32px}
+.feat li strong{display:block;font-size:18px}
+.feat li span{color:var(--mute);font-size:16px}
+
+/* installare */
+.install{background:var(--bg2);border-radius:36px;padding:44px 28px;margin:0 -8px}
+.install h2{font-size:clamp(34px,5vw,52px);margin-bottom:8px}
+.install>p{color:var(--mute);margin:0 0 28px;max-width:46ch}
+.way{display:grid;grid-template-columns:150px 1fr auto;gap:12px 24px;align-items:center;padding:20px 0}
+.way+.way{border-top:1px solid var(--line)}
+.way h3{font-size:26px}
+.way p{margin:0;color:var(--mute);font-size:16px}
+.way code{display:block;margin-top:8px;font:13px/1.4 ui-monospace,monospace;word-break:break-all;background:var(--bg);padding:10px 12px;border-radius:12px;color:var(--ink)}
+.way .btn{padding:12px 20px}
+
+footer{padding:40px 0 56px;color:var(--mute);font-size:15px;display:flex;flex-wrap:wrap;gap:12px 28px;align-items:center}
+footer .sp{margin-left:auto}
+.note{max-width:62ch;margin-top:16px;font-size:14px}
+
+@media (max-width:820px){
+  .hero{grid-template-columns:1fr;gap:28px;padding-top:12px}
+  .feat{grid-template-columns:1fr}
+  .feat h2{position:static}
+  .feat ul{grid-template-columns:1fr}
+  .way{grid-template-columns:1fr}
+  nav a{padding:8px 10px}
+  .install{margin:0 -20px;border-radius:28px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important}
+  .cover svg{animation:none}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <a class="brand" href="./"><img src="icon.png" alt="">Sonora</a>
+  <nav aria-label="Main">
+    <a href="#features">Features</a>
+    <a href="#install">Download</a>
+    <a href="web/">Web player</a>
+    <a href="https://t.me/sonoraclient">Telegram</a>
+  </nav>
+</header>
+
+<main>
+<div class="hero">
+  <div>
+    <h1>Your music, in your phone's colors.</h1>
+    <p class="lead">Songs from YouTube Music with synced lyrics, playing in the background. Free, and made from a phone.</p>
+    <div class="cta">
+      <a class="btn" href="https://github.com/realmike0/sonora/releases">Download the APK</a>
+      <a class="btn alt" href="#install">Other ways to install</a>
+    </div>
+    <p class="meta">Android 8.0 or later. Currently in beta, new versions come out often.</p>
+  </div>
+
+  <div class="stage" aria-label="Example of synced lyrics">
+    <div class="now">
+      <div class="cover" aria-hidden="true"><svg viewBox="-60 -60 120 120"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--pri)"/><stop offset="1" stop-color="var(--ink)"/></linearGradient></defs><path id="cookie" fill="url(#g)"/></svg></div>
+      <div><b id="title">Low tide</b><span id="artist">An imaginary band</span></div>
+    </div>
+    <div class="lyrics" aria-live="off"><ol id="lines"></ol></div>
+    <div class="bar" aria-hidden="true"><i id="prog"></i></div>
+    <div class="picker" role="group" aria-label="Pick a cover to recolor the page">
+      Tap a cover, the page follows:
+      <button style="--c:262" aria-label="Violet cover" aria-pressed="true" data-h="262" data-t="Low tide" data-a="An imaginary band"></button>
+      <button style="--c:24" aria-label="Orange cover" aria-pressed="false" data-h="24" data-t="Sunday heat" data-a="Paper Suns"></button>
+      <button style="--c:165" aria-label="Green cover" aria-pressed="false" data-h="165" data-t="Night bus" data-a="The Quiet Hours"></button>
+      <button style="--c:340" aria-label="Pink cover" aria-pressed="false" data-h="340" data-t="Static hearts" data-a="Mono Kite"></button>
+    </div>
+  </div>
+</div>
+
+<section id="features" style="padding-top:24px">
+  <div class="feat">
+    <h2>Listen</h2>
+    <ul>
+      <li><strong>Background playback</strong><span>Keeps playing with the screen off, with controls in the notification and on the lock screen.</span></li>
+      <li><strong>Smooth mixing</strong><span>Songs blend into each other, and there is an equalizer.</span></li>
+      <li><strong>Downloads and cache</strong><span>Long-press a song and choose Download. Set the cache from 1 GB to unlimited.</span></li>
+      <li><strong>Audio haptics</strong><span>Your phone vibrates to the beat, with adjustable sensitivity.</span></li>
+    </ul>
+  </div>
+  <div class="feat">
+    <h2>Read along</h2>
+    <ul>
+      <li><strong>Synced lyrics</strong><span>Line by line, from 5 sources, with translation.</span></li>
+      <li><strong>Lyrics image</strong><span>Share a line as a picture tinted with the cover's colors.</span></li>
+      <li><strong>AI rating</strong><span>A score for artists and albums, plus daily picks and a queue remix.</span></li>
+      <li><strong>Search</strong><span>Find songs and artists by typing or by voice.</span></li>
+    </ul>
+  </div>
+  <div class="feat">
+    <h2>Share</h2>
+    <ul>
+      <li><strong>Sonora ID</strong><span>One account for your favorites and playlists on every phone.</span></li>
+      <li><strong>Dedications</strong><span>Dedicate a song to someone. Everyone with a Sonora ID can see it.</span></li>
+      <li><strong>Comments</strong><span>Talk about a song, checked by AI and by moderators.</span></li>
+      <li><strong>Wrapped</strong><span>Your year in music. Tracking is optional and off until you say yes.</span></li>
+    </ul>
+  </div>
+  <div class="feat">
+    <h2>Everywhere</h2>
+    <ul>
+      <li><strong>Material You</strong><span>The whole interface takes its colors from your wallpaper.</span></li>
+      <li><strong>Phones and tablets</strong><span>Two panes on tablets, an always-on display mode in landscape.</span></li>
+      <li><strong>Headphones and car</strong><span>When they connect you get a notification with Start listening.</span></li>
+      <li><strong>7 languages</strong><span>Italiano, English, Español, Deutsch, Français, Türkçe and Shqip.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="install" style="padding-top:8px">
+  <div class="install">
+    <h2>Pick how to install</h2>
+    <p>Same app, three ways to get it. F-Droid and Obtainium update it for you.</p>
+    <div class="way">
+      <h3>F-Droid</h3>
+      <div><p>Add the Sonora repository, then install and update from F-Droid.</p>
+        <code id="repo">https://realmike0.github.io/sonora/fdroid/repo?fingerprint=__FP__</code></div>
+      <div><a class="btn" href="fdroidrepos://realmike0.github.io/sonora/fdroid/repo?fingerprint=__FP__">Add to F-Droid</a>
+        <button class="btn alt" id="copy" type="button" style="border:0;cursor:pointer;margin-top:8px;font:inherit;font-weight:700">Copy link</button></div>
+    </div>
+    <div class="way">
+      <h3>Obtainium</h3>
+      <p>Open the link, then turn on "Include pre-releases", because betas are pre-releases.</p>
+      <a class="btn" href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/realmike0/sonora">Add to Obtainium</a>
+    </div>
+    <div class="way">
+      <h3>By hand</h3>
+      <p>Download the latest .apk from Releases and open it. If Android asks, allow installing from your browser.</p>
+      <a class="btn" href="https://github.com/realmike0/sonora/releases">Open Releases</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <a href="https://t.me/sonoraclient">Telegram channel</a>
+  <a href="https://github.com/realmike0/sonora">Source code</a>
+  <a href="https://github.com/realmike0/sonora/blob/main/docs/PRIVACY.md">Privacy</a>
+  <a href="web/">Web player</a>
+  <span class="sp">Made by <a href="https://www.github.com/realmike0">realmike0</a></span>
+  <p class="note">Sonora is not affiliated with YouTube, Google or YouTube Music. It relies on unofficial web services and might stop working if YouTube changes something.</p>
+</footer>
+</div>
+
+<script>
+(function(){
+  // la scritta qui sotto è un esempio inventato, non una canzone vera
+  var LINES=["Come in slow, the water's low","Every light is on the coast","Hold the chorus, let it go","We never needed it the most","Turn it up, it's yours tonight","Colors move across the glass","Say the words, they'll find the time","Nothing here is meant to last"];
+  var ol=document.getElementById("lines"),prog=document.getElementById("prog"),i=0,timer;
+  ol.innerHTML=LINES.map(function(l){return "<li>"+l+"</li>"}).join("");
+  var items=ol.children,reduce=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function show(n){
+    i=n%items.length;
+    for(var k=0;k<items.length;k++)items[k].className=k===i?"on":"";
+    var box=ol.parentNode.clientHeight;
+    ol.style.transform="translateY("+(box/2-items[i].offsetTop-items[i].offsetHeight/2)+"px)";
+    prog.style.width=((i+1)/items.length*100)+"%";
+  }
+  function start(){clearInterval(timer);if(!reduce)timer=setInterval(function(){show(i+1)},2600)}
+  show(0);start();
+  // la forma "biscotto" della copertina, la stessa dell'app
+  var p="",N=9,steps=180;
+  for(var k=0;k<=steps;k++){var a=k/steps*Math.PI*2,r=50*(1+0.06*Math.cos(N*a));p+=(k?"L":"M")+(r*Math.cos(a)).toFixed(2)+" "+(r*Math.sin(a)).toFixed(2)}
+  document.getElementById("cookie").setAttribute("d",p+"Z");
+  // scegli una copertina: cambia il colore di tutta la pagina
+  var bs=document.querySelectorAll(".picker button");
+  Array.prototype.forEach.call(bs,function(b){b.addEventListener("click",function(){
+    document.documentElement.style.setProperty("--h",b.getAttribute("data-h"));
+    document.getElementById("title").textContent=b.getAttribute("data-t");
+    document.getElementById("artist").textContent=b.getAttribute("data-a");
+    Array.prototype.forEach.call(bs,function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});
+    var m=document.querySelector('meta[name=theme-color]');if(m)m.setAttribute("content","hsl("+b.getAttribute("data-h")+" 40% 12%)");
+  })});
+  var c=document.getElementById("copy");
+  c.addEventListener("click",function(){
+    var t=document.getElementById("repo").textContent;
+    try{navigator.clipboard.writeText(t).then(function(){c.textContent="Copied"},function(){c.textContent="Select the link above"})}catch(e){c.textContent="Select the link above"}
+  });
+})();
+</script>
+</body>
+</html>
